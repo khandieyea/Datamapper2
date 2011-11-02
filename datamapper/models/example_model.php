@@ -2,36 +2,35 @@
 /**
  * Template DataMapper Model
  *
- * Use this basic model as a template for creating new models.
- * It is not recommended that you include this file with your application,
- * especially if you use a Template library (as the classes may collide).
+ * You can use this basic model as a template for creating new models.
+ * It is not recommended that you include this file with your application.
  *
  * To use:
- * 1) Copy this file to the lowercase name of your new model.
- * 2) Find-and-replace (case-sensitive) 'Datamapper_model' with 'Your_model'
- * 3) Find-and-replace (case-sensitive) 'template' with 'your_model'
- * 4) Find-and-replace (case-sensitive) 'templates' with 'your_models'
+ * 1) Copy this file to a model name of your choice. Note that files must be lowercase.
+ * 2) Find-and-replace (case-sensitive) 'Example_model' with 'Your_model'
+ * 3) Find-and-replace (case-sensitive) 'example_model' with 'your_model'
+ * 4) Find-and-replace (case-sensitive) 'example_models' with 'your_models'
  * 5) Edit the file as desired.
  *
- * @license		MIT License
- * @category	Models
- * @author		Harro "WanWizard" Verton
- * @link		http://datamapper.wanwizard.eu
+ * @license     MIT License
+ * @category    Models
+ * @author      Harro "WanWizard" Verton
+ * @link        http://datamapper.wanwizard.eu
  */
 
 // -------------------------------------------------------------------------
 // model class definition
 // -------------------------------------------------------------------------
 
-class Datamapper_model extends DataMapper {
-
+class Example_model extends DataMapper
+{
 	/*
 	 * Uncomment and edit these two if the class has a model name that
 	 * doesn't convert properly using the inflector_helper.
 	 */
 
-//	protected $model = 'Datamapper_model';		// name of this model when referencing it
-// 	protected $table = 'Datamapper_model';		// name of the table that this model maps to
+//	protected $model = 'Example_model';		// name of this model when referencing it
+// 	protected $table = 'Example_models';		// name of the table that this model maps to
 
 	/*
 	 * You can override the default primary key by editing this.
@@ -56,34 +55,19 @@ class Datamapper_model extends DataMapper {
 	 * related record will not be deleted, where as has relations will.
 	 */
 
-	// Insert related models that Datamapper_model can have just one of.
+	// Insert related models that Example_model can have just one of.
 	protected $has_one = array();
 
-	// Insert related models that Datamapper_model can have more than one of.
+	// Insert related models that Example_model can have more than one of.
 	protected $has_many = array();
 
-	// Insert models that Datamapper_model belongs to.
+	// Insert models that Example_model belongs to.
 	protected $belongs_to = array();
 
 	/* Relationship Examples
-	 * For normal relationships, simply add the model name to the array:
-	 *   $has_one = array('user'); // Datamapper_model has one User
-	 *   $has_many = array('item'); // Datamapper_model has many Item
 	 *
-	 * For complex relationships, such as having a Creator and Editor for
-	 * Datamapper_model, use this form:
+	 * **TODO**
 	 */
-
-//	protected $has_one = array(
-//		'creator' => array(
-//			'class' => 'user',
-//			'other_field' => 'created_template'
-//		),
-//		'editor' => array(
-//			'class' => 'user',
-//			'other_field' => 'edited_template'
-//		)
-//	);
 
 	 /*
 	 * Don't forget to add 'created_template' and 'edited_template' to the

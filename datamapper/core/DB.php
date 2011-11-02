@@ -1,16 +1,16 @@
 <?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
 /**
- * CodeIgniter
+ * Data Mapper ORM bootstrap
  *
- * An open source application development framework for PHP 5.1.6 or newer
+ * Replacement DB class
  *
- * @package		CodeIgniter
- * @author		ExpressionEngine Dev Team
- * @copyright	Copyright (c) 2008 - 2011, EllisLab, Inc.
- * @license		http://codeigniter.com/user_guide/license.html
- * @link		http://codeigniter.com
- * @since		Version 1.0
- * @filesource
+ * @license 	MIT License
+ * @package		DataMapper ORM
+ * @category	DataMapper ORM
+ * @author  	Harro "WanWizard" Verton
+ * @link		http://datamapper.wanwizard.eu/
+ * @version 	2.0.0
  */
 
 // ------------------------------------------------------------------------

@@ -4,12 +4,12 @@
  *
  * Hooks Datamapper into the CodeIgniter core
  *
- * @license 	MIT License
- * @package		DataMapper ORM
- * @category	DataMapper ORM
- * @author  	Harro "WanWizard" Verton
- * @link		http://datamapper.wanwizard.eu/
- * @version 	2.0.0-dev
+ * @license     MIT License
+ * @package     DataMapper ORM
+ * @category    DataMapper ORM
+ * @author      Harro "WanWizard" Verton
+ * @link        http://datamapper.wanwizard.eu/
+ * @version     2.0.0-dev
  */
 
 /**

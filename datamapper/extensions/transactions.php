@@ -1,4 +1,4 @@
-<?php
+<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
  * Data Mapper ORM Class
@@ -10,7 +10,7 @@
  * @category	DataMapper ORM
  * @author  	Harro "WanWizard" Verton
  * @link		http://datamapper.wanwizard.eu/
- * @version 	2.0.0-dev
+ * @version 	2.0.0
  */
 
 class DataMapper_Transactions {
@@ -125,6 +125,56 @@ class DataMapper_Transactions {
 	public static function trans_complete($dmobject)
 	{
 		return $dmobject->db->trans_complete();
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * begin an auto transaction if enabled.
+	 *
+	 * @ignore
+	 *
+	 * @param	DataMapper	$dmobject	the DataMapper object
+	 */
+	public static function dm_auto_trans_begin($dmobject)
+	{
+		// begin auto transaction
+		$dmobject->dm_get_flag('auto_transaction') AND $dmobject->trans_begin();
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * complete an auto transaction if enabled
+	 *
+	 * @ignore
+	 *
+	 * @param	DataMapper	$dmobject	the DataMapper object
+	 * @param	string	$label	name for this transaction
+	 */
+	public static function dm_auto_trans_complete($dmobject, $label = 'complete')
+	{
+		// complete auto transaction
+		if ( $dmobject->dm_get_flag('auto_transaction') )
+		{
+			// check if successful
+			if ( ! $dmobject->trans_complete() )
+			{
+				$rule = 'transaction';
+
+				// get corresponding error from language file
+				if ( FALSE === ($line = $dmobject->dm_lang_line($rule)) )
+				{
+					$line = 'Unable to access the ' . $rule .' error message.';
+				}
+
+				// add transaction error message
+				$dmobject->error->message($rule, sprintf($line, $label));
+
+				// set validation as failed
+				$dmobject->dm_set_flag('valid') = FALSE;
+			}
+		}
 	}
 
 }

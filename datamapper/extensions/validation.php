@@ -1,4 +1,4 @@
-<?php
+<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
  * Data Mapper ORM Class
@@ -10,7 +10,7 @@
  * @category	DataMapper ORM
  * @author  	Harro "WanWizard" Verton
  * @link		http://datamapper.wanwizard.eu/
- * @version 	2.0.0-dev
+ * @version 	2.0.0
  */
 
 class DataMapper_Validation {
@@ -37,13 +37,10 @@ class DataMapper_Validation {
 		$dmobject->dm_set_flag('validated', TRUE);
 
 		// clear errors
-		$dmobject->error = new DataMapper_Errors();
-
-		// get the validation configuration
-		$config = $dmobject->dm_get_config('validation');
+		$dmobject->error = new DataMapper_Errors($dmobject);
 
 		// loop through the save_rules of each field to be validated
-		foreach ($config['save_rules'] as $field => $validation)
+		foreach ($dmobject->dm_get_config('validation', 'save_rules') as $field => $validation)
 		{
 			// skip if no rules are defined for this field
 			if ( empty($validation['rules']) )
@@ -164,7 +161,7 @@ die($TODO = 're-code save validation rules');
 						}
 
 						// Add error message
-						$dmobject->error_message($field, sprintf($line, $label, $param));
+						$dmobject->error->message($field, sprintf($line, $label, $param));
 
 						// Escape to prevent further error checks
 						break;
@@ -193,7 +190,7 @@ die($TODO = 're-code save validation rules');
 	 */
 	public static function force_validation($dmobject, $force = TRUE)
 	{
-		$dmobject->dm_set_flag('force_validation') = $force;
+		$dmobject->dm_set_flag('force_validation', $force);
 
 		// for method chaining
 		return $dmobject;
@@ -213,8 +210,8 @@ die($TODO = 're-code save validation rules');
 	 */
 	public static function skip_validation($dmobject, $skip = TRUE)
 	{
-		$dmobject->dm_set_flag('validated') = $skip;
-		$dmobject->dm_set_flag('valid') = $skip;
+		$dmobject->dm_set_flag('validated', $skip);
+		$dmobject->dm_set_flag('valid', $skip);
 
 		// for method chaining
 		return $dmobject;
@@ -231,7 +228,74 @@ die($TODO = 're-code save validation rules');
 	 */
 	public static function run_get_rules($dmobject)
 	{
-		die($TODO = 'inplement processing of get_rules');
+		// make sure we have form validation loaded
+		if ( ! isset(DataMapper::$CI->form_validation) )
+		{
+			DataMapper::$CI->load->library('form_validation');
+		}
+
+		// loop through each property to be validated
+		foreach ($dmobject->dm_get_config('validation', 'get_rules') as $field => $rules)
+		{
+			// only process non-empty keys that are not specifically set to be null
+			if ( ! isset($dmobject->{$field}) AND ! in_array('allow_null', $rules) )
+			{
+				continue;
+			}
+
+			// loop through each rule to validate this field against
+			foreach ($rules as $rule => $param)
+			{
+				// check for parameter
+				if ( is_numeric($rule) )
+				{
+					$rule = $param;
+					$param = '';
+				}
+
+				// rules to skip
+				if ( $rule == 'allow_null' )
+				{
+					continue;
+				}
+
+				// is the rule in the datamapper object itself?
+				if ( method_exists($dmobject, 'rule_'.$rule) )
+				{
+					 $dmobject->{'rule_'.$rule}($dmobject->{$field}, $param);
+				}
+
+				// is the rule a datamapper extension validation method?
+				elseif ( $method = DataMapper::dm_is_extension_method('rule_'.$rule) )
+				{
+					$dmobject->{$method}($dmobject->{$field}, $param);
+				}
+
+				// is the rule a datamapper core validation method?
+				elseif ( is_callable('self::rule_'.$rule) )
+				{
+					call_user_func_array('self::rule_'.$rule, array($dmobject->{$field}, $param));
+				}
+
+				// is the rule a CI form validation method?
+				elseif ( method_exists(DataMapper::$CI->form_validation, $rule) )
+				{
+					// Run rule from CI Form Validation
+					DataMapper::$CI->form_validation->{$rule}($dmobject->{$field}, $param);
+				}
+
+				// is the rule a defined function?
+				elseif ( function_exists( $rule) )
+				{
+					$dmobject->{$field} = $rule( $dmobject->{$field} );
+				}
+				else
+				{
+					$TODO = 'Trigger an error if the validation rule can not be found?';
+				}
+			}
+
+		}
 	}
 
 }

@@ -1,0 +1,49 @@
+DataMapper v2 Changelog:
+========================
+
+general:
+--------
+-> datamapper now requires a bootstrap file to be loaded in your site's index.php file
+-> datamapper now throws a DataMapper_Exception for all "developer" errors (unless disabled by DATAMAPPER_EXCEPTIONS)
+   constant DATAMAPPER_EXCEPTIONS can be set to FALSE to use show_error() instead of throwing exceptions
+-> datamapper now doesn't map CI classes anymore ($this->db is NOT a direct mapping to CI!)
+   CI is accessed via the DataMapper::$CI object (do not use get_instance() !)
+-> datamapper now allows base classes for DataMapper models ( class ModelA extends ModelB extends ModelC extends DataMapper )
+   it is also possible to extend Datamapper using a MY_Datamapper library, but it is preferred to use base models
+-> constant DMZ_VERSION is now called DATAMAPPER_VERSION
+-> model object data properties are case-insensitive, $object->THIS is identical to $object->this !
+-> model cache files now have an configurable expiry time
+
+extensions:
+-----------
+-> extension classes now have to be prefixed with "DataMapper_"
+-> the filename has to be lower case, and minus the prefix
+-> all methods need to be defined as static, first method parameter is the object being called on
+
+model:
+------
+-> new relationship type: belongs_to, meaning "I have the FK". has_one means "he has the FK".
+-> per model config overrides should now be defined in the $config model class property
+-> new model property "primary_key" allows you to define the tables primary
+   this supports a multi-column primary key, defined as array('keyname' => 'validation_datatype')
+-> model properties config, model, table, default_order_by, primary_key, has_one, has_many and belongs_to are supported
+   others are deprecated, and will be removed in v2.1 (a notice will be written in the logs)
+-> no more short or simple relationship definitions, as key names can not be guessed anymore
+   $relation_type = array(
+       'relationship_name' => array(
+           'my_key' => array('field')		// optional, the keys in this table for this relation, defaults to $config['keys']
+           'my_class' => 'classname'		// optional, defaults to $config['model']
+           'related_class' => 'classname'	// optional, the class of the other side of the relationship, defaults to "relationship_name"
+           'related_key' => array('field')	// required, defines my foreign keys in the other table or join table
+           'join_table' => 'tablename'		// optional, to force a join table on has_one/belongs_to relations, or to use a custom name on has_many
+           					// defaults to the alphabetical combination of relationship_name and my_class
+       )
+   )
+
+config:
+-------
+-> config : db_params: default value is now NULL instead of ''
+-> config : production_cache is now called cache_path, and valid per model
+-> config : all_array_uses_ids is now called all_array_uses_keys
+-> config : new item 'cache_expiration', defined in seconds, or 0/NULL/FALSE if cache does not expire (= pre-2.0 default)
+-> config : new item 'free_result_threshold' (was a model class property before)

@@ -1,4 +1,5 @@
-<?php
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+
 /**
  * Data Mapper ORM bootstrap
  *
@@ -9,12 +10,13 @@
  * @category	DataMapper ORM
  * @author  	Harro "WanWizard" Verton
  * @link		http://datamapper.wanwizard.eu/
- * @version 	2.0.0-dev
+ * @version 	2.0.0
  */
+
 $dmclass = <<<CODE
 class DM_DB_Driver extends $driver
 {
-	public function dm_access_method(\$function, \$p1 = null, \$p2 = null, \$p3 = null, \$p4 = null)
+	public function dm_call_method(\$function, \$p1 = null, \$p2 = null, \$p3 = null, \$p4 = null)
 	{
 		switch (func_num_args())
 		{

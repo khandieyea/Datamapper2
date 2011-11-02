@@ -1,9 +1,16 @@
 <?php	if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * Data Mapper Configuration
+ * Data Mapper ORM Class
  *
- * Global configuration settings that apply to all DataMapped models.
+ * global configuration settings that apply to all DataMapped models
+ *
+ * @license 	MIT License
+ * @package		DataMapper ORM
+ * @category	DataMapper ORM
+ * @author  	Harro "WanWizard" Verton
+ * @link		http://datamapper.wanwizard.eu/
+ * @version 	2.0.0
  */
 
 $config = array(
@@ -18,10 +25,9 @@ $config = array(
 	'auto_transaction'			=> FALSE,
 	'auto_populate_has_many'	=> FALSE,
 	'auto_populate_has_one'		=> FALSE,
-	'auto_populate_belongs_to'	=> FALSE,
 	'cache_path'				=> 'cache',
 	'cache_expiration'			=> FALSE,
-	'extensions'				=> array('array'),
+	'extensions'				=> array(),
 	'extensions_path'			=> array(),
 	'all_array_uses_keys'		=> FALSE,
 	'db_params'					=> FALSE,

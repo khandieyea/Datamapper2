@@ -1,4 +1,4 @@
-<?php
+<?php  if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
  * Data Mapper ORM Class
@@ -10,11 +10,20 @@
  * @category	DataMapper ORM
  * @author  	Harro "WanWizard" Verton
  * @link		http://datamapper.wanwizard.eu/
- * @version 	2.0.0-dev
+ * @version 	2.0.0
  */
 
 class DataMapper_Datastorage
 {
+	/*
+	 * magic getter to make sure we access all properties in lower case
+	 */
+	public function __get($name)
+	{
+		$name = strtolower($name);
+		return property_exists($this, $name) ? $this->{$name} : NULL;
+	}
+
 	/*
 	 * magic setter to make sure all properties are created in lower case
 	 */
@@ -22,8 +31,15 @@ class DataMapper_Datastorage
 	{
 		$this->{strtolower($name)} = $value;
 	}
-}
 
+	/*
+	 * magic isset to make sure we access all properties in lower case
+	 */
+	public function __isset($name)
+	{
+		return property_exists($this, strtolower($name));
+	}
+}
 
 /* End of file datastorage.php */
 /* Location: ./application/third_party/datamapper/datamapper/datastorage.php */
