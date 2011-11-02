@@ -41,6 +41,7 @@ class DataMapper_Tests_Singlekeys
 			'methods' => array(
 				'models' => 'loading test models',
 				'get' => 'basic get() operations',
+				'related' => 'related get() operations',
 			),
 		);
 	}
@@ -75,6 +76,7 @@ class DataMapper_Tests_Singlekeys
 	public function get()
 	{
 		// fetch the first record and validate the result
+
 		self::$dmtesta->where('id', 1)->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtesta->to_array(), array('id' => 1, 'data_A' => 'Table A Row 1'), 'self::$dmtesta get first record');
 
@@ -86,5 +88,32 @@ class DataMapper_Tests_Singlekeys
 
 		self::$dmtestd->where('id', 1)->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtestd->to_array(), array('id' => 1, 'fk_id_A' => 1, 'data_D' => 'Table D Row 1 FK A_1'), 'self::$dmtestd get first record');
+	}
+
+	/*
+	 * related get operations
+	 */
+	public function related()
+	{
+		// fetch the records in dmtestb related to dmtesta, id = 1
+
+		$expected_result = array(
+			array(
+				'id' => 1,
+				'data_B' => 'Table B Row 1',
+			),
+			array(
+				'id' => 2,
+				'data_B' => 'Table B Row 2',
+			),
+			array(
+				'id' => 3,
+				'data_B' => 'Table B Row 3',
+			),
+		);
+
+		self::$dmtesta->dmtestb->get();
+		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->all_to_array(), $expected_result, 'self::$dmtestd get first record');
+
 	}
 }

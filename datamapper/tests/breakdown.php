@@ -34,7 +34,7 @@ class DataMapper_Tests_Breakdown
 			'before' => array(),
 			'after' => array(),
 			'methods' => array(
-				'tables' => 'dropping test tables',
+//				'tables' => 'dropping test tables',
 			),
 		);
 	}

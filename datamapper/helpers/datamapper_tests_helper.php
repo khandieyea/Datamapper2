@@ -164,14 +164,14 @@ class DataMapper_Tests
 		foreach ( self::$testplan as $name => $tests )
 		{
 			// mark the start
-			self::mark(++$counter.' &raquo; '.$tests['title'], 1, TRUE);
+			self::mark(++$counter.' &raquo; '.$tests['title'], 3, TRUE);
 
 			// run the defined tests
 			foreach ( $tests['methods'] as $method => $title )
 			{
 				is_numeric($method) AND $method = $title;
 
-				self::mark('&raquo; '.$title,3);
+				self::mark('&raquo; '.$title, 4);
 
 				if ( $result = call_user_func('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) === FALSE )
 				{
@@ -182,7 +182,7 @@ class DataMapper_Tests
 			}
 
 			// mark the end
-			self::mark('&raquo; finished', 3, TRUE);
+			self::mark('&raquo; finished', 4, TRUE);
 		}
 
 		// print the successes and failures
@@ -200,7 +200,7 @@ class DataMapper_Tests
 	 *
 	 * @return	void
 	 */
-	public static function mark($text, $size = 2, $separator = FALSE, $style = '')
+	public static function mark($text, $size = 3, $separator = FALSE, $style = '')
 	{
 		$style == 'green' AND $style = 'color:white;background-color:green;margin:5;padding:5;';
 		$style == 'red' AND $style = 'color:white;background-color:red;margin:5;padding:5;';
@@ -215,7 +215,7 @@ class DataMapper_Tests
 	 *
 	 * @return	void
 	 */
-	public static function success($text, $size = 2, $separator = FALSE)
+	public static function success($text, $size = 5, $separator = FALSE)
 	{
 		self::mark($text, $size, $separator, 'green');
 		self::$success++;
@@ -228,7 +228,7 @@ class DataMapper_Tests
 	 *
 	 * @return	void
 	 */
-	public static function failed($text, $size = 2, $separator = FALSE)
+	public static function failed($text, $size = 5, $separator = FALSE)
 	{
 		self::mark($text, $size, $separator, 'red');
 		self::$failed++;
@@ -258,12 +258,12 @@ class DataMapper_Tests
 	{
 		if ( $var === TRUE )
 		{
-			self::success($text, 4);
+			self::success($text);
 			return TRUE;
 		}
 		else
 		{
-			self::failed($text, 4);
+			self::failed($text);
 			return FALSE;
 		}
 	}
@@ -279,12 +279,12 @@ class DataMapper_Tests
 	{
 		if ( $var === FALSE )
 		{
-			self::success($text, 4);
+			self::success($text);
 			return TRUE;
 		}
 		else
 		{
-			self::failed($text, 4);
+			self::failed($text);
 			return FALSE;
 		}
 	}
@@ -300,12 +300,12 @@ class DataMapper_Tests
 	{
 		if ( $var1 === $var2 )
 		{
-			self::success($text, 4);
+			self::success($text);
 			return TRUE;
 		}
 		else
 		{
-			self::failed($text, 4);
+			self::failed($text);
 			return FALSE;
 		}
 	}

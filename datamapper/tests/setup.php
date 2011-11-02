@@ -60,6 +60,12 @@ class DataMapper_Tests_Setup
 	 */
 	public function tables()
 	{
+		// drop our test tables
+		self::$CI->dbforge->drop_table('dmtests_A');
+		self::$CI->dbforge->drop_table('dmtests_B');
+		self::$CI->dbforge->drop_table('dmtests_C');
+		self::$CI->dbforge->drop_table('dmtests_D');
+
 		// create our test tables : standard table A
 		self::$CI->dbforge->add_field("id int(11) NOT NULL AUTO_INCREMENT");
 		self::$CI->dbforge->add_field("data_A varchar(50) NOT NULL DEFAULT ''");

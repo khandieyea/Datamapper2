@@ -653,6 +653,7 @@ class DataMapper implements IteratorAggregate
 									}
 								}
 								empty($relations['my_class']) AND $relations['my_class'] = $config['model'];
+								empty($relations['my_table']) AND $relations['my_table'] = $config['table'];
 								empty($relations['related_class']) AND $relations['related_class'] = $relation;
 								if ( empty($relations['join_table']) )
 								{
@@ -1014,17 +1015,9 @@ class DataMapper implements IteratorAggregate
 				// could be a parent object
 				if ( $param instanceOf DataMapper )
 				{
-					// store information about our parent
-					$relation = $param->dm_find_relationship($this);
-					$keys = array();
-					foreach ( $param->dm_get_config('keys') as $key => $unused )
-					{
-						$keys[$key] = $param->{$key};
-					}
-
 					$this->dm_values['parent'] = array(
-						'model' => $relation['other_field'],
-						'keys' => $keys,
+						'relation' => $param->dm_find_relationship($this),
+						'object' => $param,
 					);
 				}
 
@@ -1137,7 +1130,7 @@ class DataMapper implements IteratorAggregate
 		if ( $related_object = $this->dm_find_relationship($name) )
 		{
 			// instantiate the related object
-			$class = $related_object['class'];
+			$class = $related_object['related_class'];
 			$this->{$name} = new $class($this);
 
 			return $this->dm_current->{$name};
@@ -1236,14 +1229,22 @@ class DataMapper implements IteratorAggregate
 				if ( ! empty($pieces[0]) AND ! empty($pieces[1]) )
 				{
 					// watched method is in the middle
-					$method = 'dm_' . trim($watched_method, '_');
-					return $this->{$method}($pieces[0], array_merge(array($pieces[1]), $arguments));
+					$new_method = 'dm_' . trim($watched_method, '_');
+					if ( ! method_exists($this, $new_method) )
+					{
+						die("Method '$new_method' does not exist. Avoiding recursive calls");
+					}
+					return $this->{$new_method}($pieces[0], array_merge(array($pieces[1]), $arguments));
 				}
 				else
 				{
 					// watched method is a prefix or suffix
-					$method = 'dm_' . trim($watched_method, '_');
-					return $this->{$method}(str_replace($watched_method, '', $method), $arguments);
+					$new_method = 'dm_' . trim($watched_method, '_');
+					if ( ! method_exists($this, $new_method) )
+					{
+						die("Method '$method' does not exist. Avoiding recursive calls");
+					}
+					return $this->{$new_method}(str_replace($watched_method, '', $method), $arguments);
 					break;
 				}
 			}
@@ -2680,6 +2681,40 @@ die($TODO = 'get_raw(): handle related queries');
 		return $value;
 	}
 
+	// --------------------------------------------------------------------
+
+	/**
+	 * used several places to temporarily override the auto_populate setting
+	 *
+	 * @ignore
+	 *
+	 * @param	string	$relation		name of the related object
+	 *
+	 * @return 	array|NULL
+	 */
+	public function dm_find_relationship($relation)
+	{
+		if ( $relation instanceOf DataMapper )
+		{
+			$relation = strtolower(get_class($relation));
+		}
+
+		foreach ( $this->dm_config['relations'] as $type => $definitions )
+		{
+			foreach ( $definitions as $name => $definition )
+			{
+				if ( $name == $relation )
+				{
+					$definition['type'] = $type;
+					return $definition;
+				}
+			}
+		}
+
+		// not a valid relationship for this object
+		return FALSE;
+	}
+
 	// -------------------------------------------------------------------------
 	// DataMapper protected methods
 	// -------------------------------------------------------------------------
@@ -3034,46 +3069,6 @@ die($TODO = 'deal with the new keys structure');
 	// --------------------------------------------------------------------
 
 	/**
-	 * used several places to temporarily override the auto_populate setting
-	 *
-	 * @ignore
-	 *
-	 * @param	string	$relation		name of the related object
-	 * @param	bool	$try_singular	if TRUE, automatically tries to look for a singular name if not found
-	 *
-	 * @return 	array|NULL
-	 */
-	protected function dm_find_relationship(&$relation, $try_singular = FALSE)
-	{
-		if ( $relation instanceOf DataMapper )
-		{
-			$relation = strtolower(get_class($relation));
-		}
-
-		foreach ( $this->dm_config['relations'] as $type => $definitions )
-		{
-			foreach ( $definitions as $name => $definition )
-			{
-				if ( $name == $relation )
-				{
-					$definition['type'] = $type;
-					return $definition;
-				}
-			}
-		}
-
-		if ( $try_singular )
-		{
-			return $this->dm_find_relationship(singular($relation));
-		}
-
-		// not a valid relationship for this object
-		return FALSE;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
 	 * Handles the adding the related part of a query if $parent is set
 	 *
 	 * @ignore
@@ -3085,61 +3080,27 @@ die($TODO = 'deal with the new keys structure');
 		// if no parent is present, there's nothing to relate
 		if ( ! empty($this->dm_values['parent']) )
 		{
-			// check if we have a defined relation for the parent model
-			if ( $relation = $this->dm_find_relationship($this->dm_values['parent']['model']) )
+			// determine the keys and key values
+			$keys = array();
+
+			// only add a where clause if we have a valid parent
+			if ( $this->dm_values['parent']['object']->exists() )
 			{
-				if( ! $this->dm_get_relation($this->dm_values['parent']) )
+				foreach ( $this->dm_values['parent']['relation']['my_key'] as $key )
 				{
-					return FALSE;
+					$keys[$key] = $this->dm_values['parent']['object']->{$key};
 				}
 			}
-			else
+
+			// to ensure result integrity, group all previous queries
+			if ( ! empty($this->db->ar_where) )
 			{
-				// provide feedback on errors
-				$this_model = get_class($this);
-				throw new DataMapper_Exception ("DataMapper: '".$this->dm_values['parent']['model']."' is not a valid parent relationship for '$this_model'.  Are your relationships configured correctly?");
+				array_unshift($this->db->ar_where, '( ');
+				$this->db->ar_where[] = ' )';
 			}
-		}
 
-		return TRUE;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * finds all related records of this objects current record
-	 *
-	 * @ignore
-	 *
-	 * @param	mixed	$parent	parent definition or object
-	 * @return	bool Sucess or Failure
-	 */
-	protected function dm_get_relation($parent)
-	{
-		// no related items
-		if ( empty($parent) )
-		{
-			// reset query
-			$this->db->_reset_select();
-
-			return FALSE;
-		}
-
-		// to ensure result integrity, group all previous queries
-		if( ! empty($this->db->ar_where) )
-		{
-			array_unshift($this->db->ar_where, '( ');
-			$this->db->ar_where[] = ' )';
-		}
-
-		// query all items related to the given model
-		if ( $parent instanceOf DataMapper )
-		{
-			die($TODO = 'dm_get_relation() related query based on an object');
-		}
-		else
-		{
-			$this->where_related($parent['model'], $parent['keys']);
+			// add the related table selection to the query
+			$this->where_related($this->dm_values['parent']['relation']['my_class'], $keys);
 		}
 
 		return TRUE;
@@ -3160,93 +3121,189 @@ die($TODO = 'deal with the new keys structure');
 	 */
 	protected function dm_related($query, $arguments = array(), $extra = NULL)
 	{
-		if ( ! empty($query) && ! empty($arguments))
+		if ( ! empty($query) && ! empty($arguments) )
 		{
-			$object = $selection = NULL;
-
-			$next_arg = 1;
-
+			// related by object
 			if ( $arguments[0] instanceOf DataMapper )
 			{
 				die($TODO = 'dm_related() related query based on an object');
 			}
+
+			// related by deep relationship
+			elseif ( strpos($arguments[0], '/') !== FALSE )
+			{
+				die($TODO = 'dm_related() related query based on an deep relation');
+			}
+
+			// normal relationship
 			else
 			{
-				// fetch the relation details
-				$related_field = $arguments[0];
-				if ( ! $relation = $this->dm_find_relationship($related_field, TRUE) )
+				// find out what the relation is
+				$related_field = array_shift($arguments);
+				if ( ! $relation = $this->dm_find_relationship($related_field) )
 				{
-					throw new DataMapper_Exception("DataMapper: Unable to relate {$this->dm_config['model']} with $related_field.");
+					throw new DataMapper_Exception("DataMapper: Unable to relate {$this->dm_config['model']} with '$related_field'.");
 				}
-				$class = $relation['class'];
+				$class = $relation['related_class'];
 
-				// object determination
-				if ( isset($arguments[1]) )
+				// no selection arguments present
+				if ( empty($arguments) )
 				{
-					// enables where_related_{model}($object)
-					if ( $arguments[1] instanceOf DataMapper )
-					{
-						$object = $arguments[$next_arg++];
-					}
-					else
-					{
-						$object = new $class();
-					}
+					$selection = array();
+					$object = new $class();
+				}
+
+				// selection is already an array
+				elseif ( is_array($arguments[0]) )
+				{
+					$selection = array_shift($arguments);
+					$object = new $class();
+				}
+
+				// selection is another object
+				elseif ( $arguments[0] instanceOf DataMapper )
+				{
+					$object = array_shift($arguments);
+					die($TODO = 'related query based on a passed object');
 				}
 				else
 				{
-					die($TODO = 'dm_related(): no arguments passed for the query');
-				}
-
-				// selection criteria
-				if ( is_array($arguments[$next_arg]) )
-				{
-					$selection = $arguments[$next_arg++];
-				}
-				else
-				{
-					die($TODO = 'dm_related(): selection argument passed is not an array');
+					$object = new $class();
+					die($TODO = 'related query based on a passed field/value pair');
 				}
 			}
 
-			// determine relationship table name, and join the tables
-$TODO = 'call with 3rd = TRUE when $selection only contains the primary keys';
-			$related_table = $this->dm_add_related_table($object, $related_field);
+			// get the relationship definition seen from the related model
+			$other_relation = $object->dm_find_relationship($this->dm_config['model']);
 
-			// add the related table to the selection keys
-			foreach ( $selection as $key => $value )
-			{
-				if ( strpos($key, '.') === FALSE )
-				{
-					$selection[$related_table.'.'.$key] = $value;
-					unset($selection[$key]);
-				}
+			$TODO = 'prevent un-needed joins when selecting on related keys only';
 
-				if ( is_string($value) AND strpos($value, '${parent}') !== FALSE )
-				{
-					$extra = FALSE;
-				}
-			}
+			// add the join to the query
+			$this->dm_add_relation($relation, $other_relation);
 
 			// allow special arguments to be passed into query methods
 			if ( is_null($extra) )
 			{
-				isset($arguments[$next_arg]) AND $extra = $arguments[$next_arg];
+				isset($arguments[0]) AND $extra = $arguments[0];
 			}
 
-			// add query clause
+			// prefix the keys with the related table name
+			$keys = array();
+			foreach ( $selection as $name => $value )
+			{
+				$keys[$other_relation['my_table'].'.'.$name] = $value;
+			}
+
+			// add the selection to the query
 			if ( is_null($extra) )
 			{
-				$this->{$query}($selection);
+				$this->{$query}($keys);
 			}
 			else
 			{
-				$this->{$query}($selection, NULL, $extra);
+				$this->{$query}($keys, NULL, $extra);
 			}
 		}
 
 		// For method chaining
 		return $this;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * sets the specified related query
+	 *
+	 * @ignore
+	 *
+	 * @param	array	$modela		relation definition for table A, the current model
+	 * @param	array	$modelb		relation definition for table B, the joined model
+	 * @param	bool	$join_only	if true, only join the join table on a many-to-many
+	 *
+	 * @return	void
+	 */
+	protected function dm_add_relation(Array $modela, Array $modelb, $join_only = FALSE)
+	{
+		// force the selection of the current object's columns
+		if (empty($this->db->ar_select))
+		{
+			$this->db->select($this->dm_config['table'] . '.*');
+		}
+
+		// many-to-many relationship
+		if ( $modela['type'] == 'has_many' AND $modelb['type'] == 'has_many' )
+		{
+			// make sure we share the same join table
+			if ( $modela['join_table'] != $modela['join_table'] )
+			{
+				throw new DataMapper_Exception("DataMapper: '".$modela['related_class']."' and '".$modelb['my_class']."' must define the same join table");
+			}
+
+			$alias1 = $modela['join_table'];
+			if ( ! in_array($alias1, $this->dm_values['query_related']) )
+			{
+				// build the join condition
+				$cond = '';
+				for ( $i = 0; $i < count($modela['my_key']); $i++ )
+				{
+					$cond .= ( empty($cond) ? '' : ' AND ' ) . $alias1.'.'.$modela['related_key'][$i];
+					$cond .= ' = ' . $modela['my_table'].'.'.$modela['my_key'][$i];
+				}
+
+				// join modela to the join table
+				$this->db->join($modela['join_table'].' '.$this->db->protect_identifiers($alias1), $cond, 'LEFT OUTER');
+			}
+
+			$alias2 = $modelb['my_table'];
+			if ( ! in_array($alias2, $this->dm_values['query_related']) )
+			{
+				// join modelb to the join table
+				if ( $join_only === FALSE )
+				{
+					// build the join condition
+					$cond = '';
+					for ( $i = 0; $i < count($modelb['my_key']); $i++ )
+					{
+						$cond .= ( empty($cond) ? '' : ' AND ' ) . $alias1.'.'.$modelb['related_key'][$i];
+						$cond .= ' = ' . $alias2.'.'.$modelb['my_key'][$i];
+					}
+
+					// join modela to the join table
+					$this->db->join($modelb['my_table'].' '.$this->db->protect_identifiers($alias2), $cond, 'LEFT OUTER');
+				}
+			}
+		}
+
+		// many-to-one relationship
+		elseif ( $modela['type'] == 'has_many' AND $modelb['type'] == 'belongs_to' )
+		{
+			die('many-to-one');
+		}
+
+		// one-to-many relationship
+		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_many' )
+		{
+			die('one-to-many');
+		}
+
+		// one-to-one relationship
+		elseif ( $modela['type'] == 'has_one' AND $modelb['type'] == 'belongs_to' )
+		{
+			die('one-to-one');
+		}
+
+		// one-to-one relationship
+		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' )
+		{
+			die('one-to-one');
+		}
+
+		// incompatible combination
+		else
+		{
+			throw new DataMapper_Exception("DataMapper: incompatible relation detected between '".$modela['related_class']."[".$modela['type']."]' and '".$modelb['my_class']."[".$modelb['type']."]'");
+		}
+
 	}
 
 	// -------------------------------------------------------------------------
