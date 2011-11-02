@@ -3,7 +3,8 @@ DataMapper 2 - An ORM for CodeIgniter v2.x
 
 DataMapper is an Object Relational Mapper written in PHP for CodeIgniter. It is designed to map your Database tables into easy to work with objects, fully aware of the relationships between each other.
 
-> Note that this version is currently under development, and currently not useable in any shape or form!
+> Note:
+> this version is currently under development, and currently not useable in any shape or form!
 
 
 Installation
@@ -17,20 +18,20 @@ There are five steps you have to take to enable the use of DataMapper in your ap
 
 3. Install the DataMapper bootloader in your application's index.php file
 
-    // add this, just before the CodeIgniter bootstrap is loaded
-    require_once APPPATH.'third_party/datamapper/bootstrap.php';
+			// add this, just before the CodeIgniter bootstrap is loaded
+			require_once APPPATH.'third_party/datamapper/bootstrap.php';
 
 4. Make sure the DataMapper package is added
 
-		// add the datamapper package
-		$this->load->add_package_path(APPPATH.'third_party/datamapper');
+			// add the datamapper package
+			$this->load->add_package_path(APPPATH.'third_party/datamapper');
 
 You can also autoload the package in your configuration file.
 
 5. Load the DataMapper library to activate DataMapper
 
-		// load datamapper
-		$this->load->library('datamapper');
+			// load datamapper
+			$this->load->library('datamapper');
 
 
 Test framework
