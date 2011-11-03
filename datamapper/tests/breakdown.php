@@ -49,5 +49,6 @@ class DataMapper_Tests_Breakdown
 		self::$CI->dbforge->drop_table('dmtests_B');
 		self::$CI->dbforge->drop_table('dmtests_C');
 		self::$CI->dbforge->drop_table('dmtests_D');
+		self::$CI->dbforge->drop_table('dmtests_E');
 	}
 }

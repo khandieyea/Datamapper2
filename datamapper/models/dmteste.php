@@ -3,7 +3,7 @@
 /**
  * Data Mapper ORM Class
  *
- * ORM unit tests : B table model
+ * ORM unit tests : D table model
  *
  * @license     MIT License
  * @package     DataMapper ORM
@@ -13,38 +13,36 @@
  * @version     2.0.0
  */
 
-class Dmtestb extends DataMapper
+class Dmteste extends DataMapper
 {
 	// define the model name for this model
-	protected $model = 'dmtestb';
+	protected $model = 'dmteste';
 
 	// define the tablename for this model
-	protected $table = 'dmtests_B';
+	protected $table = 'dmtests_E';
 
 	// define the primary key(s) for this model
 	protected $primary_key = array('id' => 'integer');
 
 	// insert related models that this model can have just one of
-	protected $has_one = array(
-		'dmteste' => array(
-			'related_key' => array('fk_id_B'),
-		)
-	);
+	protected $has_one = array();
 
 	// insert related models that this model can have more than one of
-	protected $has_many = array(
-		'dmtesta' => array(
-			'related_key' => array('fk_id_B'),
-			'join_table' => 'dmtests_C',
-		)
-	);
+	protected $has_many = array();
 
 	// insert models that this model belongs to
-	protected $belongs_to = array();
+	protected $belongs_to = array(
+		'dmtestb' => array(),
+	);
 
 	// define validation rules for each column
 	protected $validation = array(
 		'id' => array(
+			'get_rules' => array(
+				'intval',
+			),
+		),
+		'fk_id_B' => array(
 			'get_rules' => array(
 				'intval',
 			),

@@ -1618,7 +1618,7 @@ class DataMapper implements IteratorAggregate
 	/**
 	 * clears the current object
 	 *
-	 * @return	void
+	 * @return	DataMapper	returns self for method chaining
 	 */
 	public function clear()
 	{
@@ -1656,6 +1656,9 @@ class DataMapper implements IteratorAggregate
 		$this->dm_dataset_iterator = NULL;
 
 		$this->dm_refresh_original_values();
+
+		// For method chaining
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
@@ -3075,7 +3078,7 @@ die($TODO = 'deal with the new keys structure');
 	 *
 	 * @return	bool	success or failure
 	 */
-	protected function dm_handle_related()
+	public function dm_handle_related()
 	{
 		// if no parent is present, there's nothing to relate
 		if ( ! empty($this->dm_values['parent']) )
@@ -3101,6 +3104,9 @@ die($TODO = 'deal with the new keys structure');
 
 			// add the related table selection to the query
 			$this->where_related($this->dm_values['parent']['relation']['my_class'], $keys);
+
+			// add the relations of our parent to handle nested relations
+			$this->dm_values['parent']['object']->dm_handle_related();
 		}
 
 		return TRUE;
@@ -3140,9 +3146,10 @@ die($TODO = 'deal with the new keys structure');
 			{
 				// find out what the relation is
 				$related_field = array_shift($arguments);
+
 				if ( ! $relation = $this->dm_find_relationship($related_field) )
 				{
-					throw new DataMapper_Exception("DataMapper: Unable to relate {$this->dm_config['model']} with '$related_field'.");
+					throw new DataMapper_Exception("DataMapper: Unable to relate '{$this->dm_config['model']}' with '$related_field'");
 				}
 				$class = $relation['related_class'];
 
@@ -3252,6 +3259,9 @@ die($TODO = 'deal with the new keys structure');
 
 				// join modela to the join table
 				$this->db->join($modela['join_table'].' '.$this->db->protect_identifiers($alias1), $cond, 'LEFT OUTER');
+
+				// record this alias
+				$this->dm_values['query_related'][] = $alias1;
 			}
 
 			$alias2 = $modelb['my_table'];
@@ -3271,31 +3281,59 @@ die($TODO = 'deal with the new keys structure');
 					// join modela to the join table
 					$this->db->join($modelb['my_table'].' '.$this->db->protect_identifiers($alias2), $cond, 'LEFT OUTER');
 				}
+
+				// record this alias
+				$this->dm_values['query_related'][] = $alias2;
 			}
 		}
 
 		// many-to-one relationship
 		elseif ( $modela['type'] == 'has_many' AND $modelb['type'] == 'belongs_to' )
 		{
+var_dump('MODEL-A');
+var_dump($modela);
+var_dump('MODEL-B');
+var_dump($modelb);
 			die('many-to-one');
 		}
 
 		// one-to-many relationship
 		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_many' )
 		{
+var_dump('MODEL-A');
+var_dump($modela);
+var_dump('MODEL-B');
+var_dump($modelb);
 			die('one-to-many');
 		}
 
 		// one-to-one relationship
 		elseif ( $modela['type'] == 'has_one' AND $modelb['type'] == 'belongs_to' )
 		{
-			die('one-to-one');
+var_dump('MODEL-A');
+var_dump($modela);
+var_dump('MODEL-B');
+var_dump($modelb);
+			die('one-to-one 1');
 		}
 
 		// one-to-one relationship
 		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' )
 		{
-			die('one-to-one');
+			$alias = $modelb['my_table'];
+			if ( ! in_array($alias, $this->dm_values['query_related']) )
+			{
+				// build the join condition
+				$cond = '';
+				for ( $i = 0; $i < count($modelb['my_key']); $i++ )
+				{
+					$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['my_table'].'.'.$modelb['related_key'][$i];
+					$cond .= ' = ' . $alias.'.'.$modelb['my_key'][$i];
+				}
+
+				// join modela to the join table
+				$this->db->join($modelb['my_table'].' '.$this->db->protect_identifiers($alias), $cond, 'LEFT OUTER');
+			}
 		}
 
 		// incompatible combination

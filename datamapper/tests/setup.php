@@ -65,6 +65,7 @@ class DataMapper_Tests_Setup
 		self::$CI->dbforge->drop_table('dmtests_B');
 		self::$CI->dbforge->drop_table('dmtests_C');
 		self::$CI->dbforge->drop_table('dmtests_D');
+		self::$CI->dbforge->drop_table('dmtests_E');
 
 		// create our test tables : standard table A
 		self::$CI->dbforge->add_field("id int(11) NOT NULL AUTO_INCREMENT");
@@ -112,5 +113,16 @@ class DataMapper_Tests_Setup
 		// add test data to table D
 		self::$CI->db->insert('dmtests_D', array('fk_id_A' => 1, 'data_D' => 'Table D Row 1 FK A_1'));
 		self::$CI->db->insert('dmtests_D', array('fk_id_A' => 2, 'data_D' => 'Table D Row 1 FK A_2'));
+
+		// create our test tables : table E with in-table-foreign-key to table B
+		self::$CI->dbforge->add_field("id int(11) NOT NULL AUTO_INCREMENT");
+		self::$CI->dbforge->add_field("fk_id_B int(11) NOT NULL DEFAULT 0");
+		self::$CI->dbforge->add_field("data_E varchar(50) NOT NULL DEFAULT ''");
+		self::$CI->dbforge->add_key("id", TRUE);
+		self::$CI->dbforge->create_table('dmtests_E', TRUE);
+
+		// add test data to table E
+		self::$CI->db->insert('dmtests_E', array('fk_id_B' => 1, 'data_E' => 'Table E Row 1 FK B_1'));
+		self::$CI->db->insert('dmtests_E', array('fk_id_B' => 2, 'data_E' => 'Table E Row 1 FK B_2'));
 	}
 }
