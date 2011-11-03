@@ -145,13 +145,25 @@ class DataMapper_Tests_Singlekeys
 			),
 		);
 
-		self::$dmtesta->clear()->where('id', 1)->dmtestb->where('id', 2)->dmteste->get();
-self::$dmtesta->dmtestb->dmteste->check_last_query();
-		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->dmteste->all_to_array(), $expected_result, 'self::$dmtesta->clear()->where("id", 1)->dmtestb->where("id", 3)->dmteste->get() related records');
+		self::$dmtesta->clear()->where('id', 2)->dmtestb->where('id', 2)->dmteste->get();
+		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->dmteste->all_to_array(), $expected_result, 'self::$dmtesta->clear()->where("id", 2)->dmtestb->where("id", 2)->dmteste->get() related records');
 
 		// getting self referenced results of dmtesta, related to dmtesta.id = 1
+
+		$expected_result = array(
+			array(
+				'id' => 2,
+				'fk_id_A' => 1,
+				'data_A' => 'Table A Row 2',
+			),
+			array(
+				'id' => 3,
+				'fk_id_A' => 1,
+				'data_A' => 'Table A Row 3',
+			),
+		);
+
 		self::$dmtesta->clear()->where('id', 1)->selfref->get();
-self::$dmtesta->selfref->check_last_query();
-var_dump(self::$dmtesta->clear()->where('id', 1)->selfref->all_to_array());
+		$result = DataMapper_Tests::assertEqual(self::$dmtesta->selfref->all_to_array(), $expected_result, 'self::$dmtesta->clear()->where("id", 1)->selfref->get() self related records');
 	}
 }

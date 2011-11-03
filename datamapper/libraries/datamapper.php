@@ -152,6 +152,13 @@ class DataMapper implements IteratorAggregate
 		'dm_auto_trans_complete' => 'DataMapper_Transactions',
 	);
 
+	/**
+	 * storage for table aliases for loaded models
+	 *
+	 * @var array
+	 */
+	protected static $dm_table_aliases = array();
+
 	// --------------------------------------------------------------------
 
 	/**
@@ -446,15 +453,21 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected static function dm_configure_model(&$object)
 	{
+		// to make sure every model/table has a unique alias number
+		static $alias_counter = 0;
+
+		// fetch and prep the model class name
+		$model_class = singular(strtolower(get_class($object)));
+
 		// determine the name of the model we're configuring
-		if ( isset($object->model) AND is_string($object->model) AND ! empty($object->model) )
+		if ( isset($object->model) AND is_string($object->model) AND ! empty($object->model) AND $object->model != $model_class )
 		{
-			$model_class = $object->model;
+			$model = $object->model;
+			$model_class .= '_'.$model;
 		}
 		else
 		{
-			// fetch and prep the model class name
-			$model_class = singular(strtolower(get_class($object)));
+			$model = $model_class;
 		}
 
 		// this is to ensure that this is only done once per model
@@ -462,23 +475,23 @@ class DataMapper implements IteratorAggregate
 		{
 			// setup the model config
 			DataMapper::$dm_model_config[$model_class] = array(
-				'model'		=> $model_class,
-				'table'		=> plural($model_class),
+				'model'		=> $model,
+				'table'		=> plural($model),
 				'keys'		=> array('id' => 'integer'),
 				'fields'	=> array(),
 				'config'	=> DataMapper::$dm_global_config,
 			);
 
-			// create a shortcut, we're lazy...
-			$config =& DataMapper::$dm_model_config[$model_class];
+			// assign the new model config to the object
+			$object->dm_config =& DataMapper::$dm_model_config[$model_class];
 
 			// load language file, if requested and it exists
-			if ( ! empty($config['config']['lang_file_format']) )
+			if ( ! empty($object->dm_config['config']['lang_file_format']) )
 			{
 				$lang_file = str_replace(
 					array('${model}', '${table}'),
-					array($config['model'], $config['table']),
-					$config['config']['lang_file_format']
+					array($object->dm_config['model'], $object->dm_config['table']),
+					$object->dm_config['config']['lang_file_format']
 				);
 
 				DataMapper::dm_load_lang($lang_file);
@@ -487,12 +500,12 @@ class DataMapper implements IteratorAggregate
 			$loaded_from_cache = FALSE;
 
 			// load in the production cache for this model, if it exists and not expired
-			if ( ! empty($config['config']['cache_path']))
+			if ( ! empty($object->dm_config['config']['cache_path']))
 			{
-				$cache_file = $config['config']['cache_path'] . $model_class . EXT;
+				$cache_file = $object->dm_config['config']['cache_path'] . $model_class . EXT;
 				if ( file_exists($cache_file) )
 				{
-					if ( ! empty($config['config']['cache_expiration']) AND filemtime($cache_file) + $config['config']['cache_expiration'] > time() )
+					if ( ! empty($object->dm_config['config']['cache_expiration']) AND filemtime($cache_file) + $object->dm_config['config']['cache_expiration'] > time() )
 					{
 						DataMapper::$dm_model_config[$model_class] = unserialize(file_get_contents($cache_file));
 						$loaded_from_cache = TRUE;
@@ -507,14 +520,14 @@ class DataMapper implements IteratorAggregate
 				$warn = TRUE;
 				foreach ( get_object_vars($object) as $name => $value)
 				{
-					if ( isset($config['config'][$name]) )
+					if ( isset($object->dm_config['config'][$name]) )
 					{
 						if ( $warn )
 						{
-							log_message('debug', "Datamapper: Using model object properties in '".$config['model']."' for configuration is deprecated and will be removed in the next version!");
+							log_message('debug', "DataMapper: Using model object properties in '".$object->dm_config['model']."' for configuration is deprecated and will be removed in the next version!");
 							$warn = FALSE;
 						}
-						$config['config'][$name] = $value;
+						$object->dm_config['config'][$name] = $value;
 					}
 				}
 				// *** end DEPRECATED, REMOVE IN v2.1
@@ -524,48 +537,52 @@ class DataMapper implements IteratorAggregate
 				{
 					foreach ( $object->config as $name => $value)
 					{
-						isset($config['config'][$name]) AND $config['config'][$name] = $value;
+						isset($object->dm_config['config'][$name]) AND $object->dm_config['config'][$name] = $value;
 					}
 				}
 
 				// and validate it
-				DataMapper::dm_validate_config($config['config'], get_class($object));
+				DataMapper::dm_validate_config($object->dm_config['config'], get_class($object));
 
 				// add any extension paths to the autoloader
-				DataMapper::add_extension_path($config['config']['extensions_path']);
-				unset($config['config']['extensions_path']);
+				DataMapper::add_extension_path($object->dm_config['config']['extensions_path']);
+				unset($object->dm_config['config']['extensions_path']);
 
 				// load and initialize model extensions
-				DataMapper::dm_load_extensions($config['config']['extensions'], $config['config']['extension_overload']);
-				unset($config['config']['extensions']);
+				DataMapper::dm_load_extensions($object->dm_config['config']['extensions'], $object->dm_config['config']['extension_overload']);
+				unset($object->dm_config['config']['extensions']);
 
 				// check if we have a custom table name ( needed if plural(class) fails )
 				if ( isset($object->table) AND is_string($object->table) AND ! empty($object->table) )
 				{
-					$config['table'] = $object->table;
+					$object->dm_config['table'] = $object->table;
 				}
+
 				// and add prefix to table
-				$config['table'] = $config['config']['prefix'] . $config['table'];
+				$object->dm_config['table'] = $object->dm_config['config']['prefix'] . $object->dm_config['table'];
+
+				// store the alias for this model / table combination
+				DataMapper::$dm_table_aliases[$model] = 'DM_'.$alias_counter++;
 
 				// check if we have a custom primary keys
 				if ( isset($object->primary_key) AND is_array($object->primary_key) AND ! empty($object->primary_key) )
 				{
 					// replace the default 'id' key
-					$config['keys'] = $object->primary_key;
+					$object->dm_config['keys'] = $object->primary_key;
 				}
 
 				// check if we have a default order_by
 				if ( isset($object->default_order_by) AND is_array($object->default_order_by) AND ! empty($object->default_order_by) )
 				{
-					$config['order_by'] = $object->default_order_by;
+					$object->dm_config['order_by'] = $object->default_order_by;
 				}
 				else
 				{
-					$config['order_by'] = array();
+					$object->dm_config['order_by'] = array();
 				}
 
 				// validation information for this model
-				$config['validation'] = array(
+				$object->dm_config['validation'] = array(
 					'save_rules' => array(),
 					'get_rules' => array(),
 					'matches' => array(),
@@ -604,19 +621,19 @@ class DataMapper implements IteratorAggregate
 
 						if ( ! empty($validation['get_rules']) )
 						{
-							$config['validation']['get_rules'][$name] = $validation['get_rules'];
+							$object->dm_config['validation']['get_rules'][$name] = $validation['get_rules'];
 						}
 
 						// check if there is a "matches" validation rule
 						if ( isset($validation['rules']['matches']) )
 						{
-							$config['validation']['matches'][$name] = $validation['rules']['matches'];
+							$object->dm_config['validation']['matches'][$name] = $validation['rules']['matches'];
 						}
 					}
 				}
 
 				// set up validations for the keys, if not present
-				foreach ( $config['keys'] as $name => $value )
+				foreach ( $object->dm_config['keys'] as $name => $value )
 				{
 					if ( ! isset($associative_validation[$name]) )
 					{
@@ -626,19 +643,19 @@ class DataMapper implements IteratorAggregate
 						);
 						if ($value == 'integer')
 						{
-							if ( isset($config['validation']['get_rules'][$name]) )
+							if ( isset($object->dm_config['validation']['get_rules'][$name]) )
 							{
-								! in_array('intval', $config['validation']['get_rules'][$name]) AND $config['validation']['get_rules'][$name][] = 'intval';
+								! in_array('intval', $object->dm_config['validation']['get_rules'][$name]) AND $object->dm_config['validation']['get_rules'][$name][] = 'intval';
 							}
 							else
 							{
-								$config['validation']['get_rules'][$name] = array('intval');
+								$object->dm_config['validation']['get_rules'][$name] = array('intval');
 							}
 						}
 					}
 				}
 
-				$config['validation']['save_rules'] = $associative_validation;
+				$object->dm_config['validation']['save_rules'] = $associative_validation;
 
 				// construct the relationship definitions
 				foreach ( array('has_one', 'has_many', 'belongs_to') as $rel_type )
@@ -653,13 +670,13 @@ class DataMapper implements IteratorAggregate
 								if ( empty($relations['my_key']) )
 								{
 									$relations['my_key'] = array();
-									foreach ( $config['keys'] as $key => $unused )
+									foreach ( $object->dm_config['keys'] as $key => $unused )
 									{
 										$relations['my_key'][] = $key;
 									}
 								}
-								empty($relations['my_class']) AND $relations['my_class'] = $config['model'];
-								empty($relations['my_table']) AND $relations['my_table'] = $config['table'];
+								empty($relations['my_class']) AND $relations['my_class'] = $object->dm_config['model'];
+								empty($relations['my_table']) AND $relations['my_table'] = $object->dm_config['table'];
 								empty($relations['related_class']) AND $relations['related_class'] = $relation;
 								if ( empty($relations['join_table']) )
 								{
@@ -671,81 +688,78 @@ class DataMapper implements IteratorAggregate
 								}
 								elseif ( empty($relations['related_key']) OR ! is_array($relations['related_key']) )
 								{
-									throw new DataMapper_Exception("DataMapper: missing 'related_key' in $rel_type relation '$relation' in model '".$config['model']."'");
+									throw new DataMapper_Exception("DataMapper: missing 'related_key' in $rel_type relation '$relation' in model '".$object->dm_config['model']."'");
 								}
 
 								// and store it
-								$config['relations'][$rel_type][$relation] = $relations;
+								$object->dm_config['relations'][$rel_type][$relation] = $relations;
 							}
 							else
 							{
-								throw new DataMapper_Exception("DataMapper: invalid '$rel_type' relation detected in model '".$config['model']."'");
+								throw new DataMapper_Exception("DataMapper: invalid '$rel_type' relation detected in model '".$object->dm_config['model']."'");
 							}
 						}
 					}
 					else
 					{
-						$config['relations'][$rel_type] = array();
+						$object->dm_config['relations'][$rel_type] = array();
 					}
 				}
 
 				// get and store the table's field names and meta data
-				$fields = $object->db->field_data($config['table']);
+				$fields = $object->db->field_data($object->dm_config['table']);
 
 				// store only the field names and ensure validation list includes all fields
 				foreach ($fields as $field)
 				{
 					// populate fields array
-					$config['fields'][] = $field->name;
+					$object->dm_config['fields'][] = $field->name;
 
 					// add validation if current field has none
-					if ( ! isset($config['validation']['rules'][$field->name]) )
+					if ( ! isset($object->dm_config['validation']['rules'][$field->name]) )
 					{
 						// label is set below, to prevent caching language-based labels
-						$config['validation']['save_rules'][$field->name] = array('field' => $field->name, 'rules' => array());
+						$object->dm_config['validation']['save_rules'][$field->name] = array('field' => $field->name, 'rules' => array());
 					}
 				}
 
 				// check if all defined keys are valid fields
-				foreach ( $config['keys'] as $name => $type )
+				foreach ( $object->dm_config['keys'] as $name => $type )
 				{
-					if ( ! in_array($name, $config['fields']) )
+					if ( ! in_array($name, $object->dm_config['fields']) )
 					{
-						throw new DataMapper_Exception("DataMapper: Key field '$name' is not a valid column for table '".$config['table']."' in model '".$config['model']."'");
+						throw new DataMapper_Exception("DataMapper: Key field '$name' is not a valid column for table '".$object->dm_config['table']."' in model '".$object->dm_config['model']."'");
 					}
 				}
 
 				// write to cache if needed
-				if ( ! empty($config['config']['cache_path']) AND ! empty($config['config']['cache_expiration']) )
+				if ( ! empty($object->dm_config['config']['cache_path']) AND ! empty($object->dm_config['config']['cache_expiration']) )
 				{
-					$cache_file = $config['config']['cache_path'] . $model_class . EXT;
+					$cache_file = $object->dm_config['config']['cache_path'] . $model_class . EXT;
 					file_put_contents($cache_file, serialize(DataMapper::$dm_model_config[$model_class]), LOCK_EX);
 				}
 			}
 
 			// record where we got this config from
-			$config['from_cache'] =  $loaded_from_cache;
+			$object->dm_config['from_cache'] =  $loaded_from_cache;
 		}
 		else
 		{
-			// create a shortcut, we're lazy...
-			$config =& DataMapper::$dm_model_config[$model_class];
+			// assign the existing model config to the object
+			$object->dm_config =& DataMapper::$dm_model_config[$model_class];
 		}
 
 		// finally, localize the labels here (because they shouldn't be cached
 		// this also sets any missing labels.
-		foreach($config['validation']['save_rules'] as $field => &$val)
+		foreach($object->dm_config['validation']['save_rules'] as $field => &$val)
 		{
-			$val['label'] = $object->dm_lang_line($field, isset($val['label']) ? $val['label'] : FALSE, $config);
+			$val['label'] = $object->dm_lang_line($field, isset($val['label']) ? $val['label'] : FALSE, $object->dm_config);
 		}
-
-		// assign the resulting config to the model object
-		$object->dm_config =& DataMapper::$dm_model_config[$model_class];
 
 		// if the model contains a post_model_init, call it now
 		if ( method_exists($object, 'post_model_init') )
 		{
-			$object->post_model_init($config['from_cache']);
+			$object->post_model_init($object->dm_config['from_cache']);
 		}
 	}
 
@@ -899,7 +913,6 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected $dm_values = array(
 		'parent' => NULL,
-		'query_related' => array(),
 		'instantiations' =>NULL,
 	);
 
@@ -951,7 +964,7 @@ class DataMapper implements IteratorAggregate
 			// make sure CI is up to spec
 			if ( version_compare(CI_VERSION, '2.0.0') < 0 )
 			{
-				throw new DataMapper_Exception("Datamapper: this version only works on CodeIgniter v2.0.0 and above");
+				throw new DataMapper_Exception("DataMapper: this version only works on CodeIgniter v2.0.0 and above");
 			}
 
 			// get the CodeIgniter "superobject"
@@ -960,7 +973,7 @@ class DataMapper implements IteratorAggregate
 			// check if we're bootstrapped properly
 			if ( get_class(DataMapper::$CI->load) != 'DM_Loader' )
 			{
-				throw new DataMapper_Exception("Datamapper: bootstrap is not loaded in your index.php file");
+				throw new DataMapper_Exception("DataMapper: bootstrap is not loaded in your index.php file");
 			}
 
 			// store the path to the DataMapper installation
@@ -1067,26 +1080,38 @@ class DataMapper implements IteratorAggregate
 		// this allows multiple queries to be generated at the same time.
 		if ( $name == 'db' )
 		{
-			// get the model config from static, our local one might not be loaded yet
-			$config =& DataMapper::$dm_model_config[strtolower(get_class($this))];
-
 			// mode 1: re-use CodeIgniters existing database connection, which must be loaded before loading DataMapper
-			if ( $config['config']['db_params'] === FALSE )
+			if ( $this->dm_config['config']['db_params'] === FALSE )
 			{
-				if ( ! isset(DataMapper::$CI->db) OR ! is_object(DataMapper::$CI->db) OR ! isset(DataMapper::$CI->db->dbdriver) )
+				// autoload the database if needed
+				if ( ! class_exists('DM_DB_Driver', FALSE) )
 				{
-					throw new DataMapper_Exception("Datamapper: CodeIgniter database library not loaded");
+					DataMapper::$CI->load->database();
+
+					if ( ! class_exists('DM_DB_Driver', FALSE) )
+					{
+						throw new DataMapper_Exception("DataMapper: CodeIgniter database library not loaded, or DataMappers index.php bootstrap not installed!");
+					}
+
 				}
+
 				$this->db =& DataMapper::$CI->db;
 			}
 			else
 			{
 				// mode 2: clone CodeIgniters existing database connection, which must be loaded before loading DataMapper
-				if ( $config['config']['db_params'] === NULL OR $config['config']['db_params'] === TRUE )
+				if ( $this->dm_config['config']['db_params'] === NULL OR $this->dm_config['config']['db_params'] === TRUE )
 				{
-					if ( ! isset(DataMapper::$CI->db) OR ! is_object(DataMapper::$CI->db) OR ! isset(DataMapper::$CI->db->dbdriver) )
+					// autoload the database if needed
+					if ( ! class_exists('DM_DB_Driver', FALSE) )
 					{
-						throw new DataMapper_Exception("Datamapper: CodeIgniter database library not loaded");
+						DataMapper::$CI->load->database();
+
+						if ( ! class_exists('DM_DB_Driver', FALSE) )
+						{
+							throw new DataMapper_Exception("DataMapper: CodeIgniter database library not loaded, or DataMappers index.php bootstrap not installed!");
+						}
+
 					}
 
 					// ensure the shared DB is disconnected, even if the app exits uncleanly
@@ -1108,7 +1133,7 @@ class DataMapper implements IteratorAggregate
 				{
 					// connecting to a different database, so we *must* create additional copies.
 					// It is up to the developer to close the connection!
-					$this->db = DataMapper::$CI->load->database($config['config']['db_params'], TRUE, TRUE);
+					$this->db = DataMapper::$CI->load->database($this->dm_config['config']['db_params'], TRUE, TRUE);
 				}
 
 				// these items are shared (for debugging)
@@ -1434,7 +1459,7 @@ class DataMapper implements IteratorAggregate
 				$this->dm_default_order_by();
 
 				// get by objects properties
-				$query = $this->db->get_where($this->dm_config['table'], $data, $limit, $offset);
+				$query = $this->db->get_where($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model']), $data, $limit, $offset);
 			}
 			else
 			{
@@ -1451,7 +1476,7 @@ class DataMapper implements IteratorAggregate
 			$this->dm_default_order_by();
 
 			// get by built up query
-			$query = $this->db->get($this->dm_config['table'], $limit, $offset);
+			$query = $this->db->get($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE), $limit, $offset);
 		}
 
 		// convert the query result into DataMapper objects
@@ -1654,9 +1679,6 @@ class DataMapper implements IteratorAggregate
 				}
 			}
 		}
-
-		// clear the query related list
-		$this->dm_values['query_related'] = array();
 
 		// clear and refresh stored values
 		$this->dm_original = new DataMapper_Datastorage();
@@ -2343,7 +2365,7 @@ class DataMapper implements IteratorAggregate
 				$subparts = explode(' ', $part, 2);
 				if ( $subparts[0] == '*' OR in_array($subparts[0], $this->dm_config['fields']) )
 				{
-					$field .= $this->db->protect_identifiers($this->dm_config['table']  . '.' . $part);
+					$field .= $this->db->protect_identifiers($this->dm_table_alias($this->dm_config['model'])  . '.' . $part);
 				}
 				else
 				{
@@ -2353,6 +2375,22 @@ class DataMapper implements IteratorAggregate
 		}
 
 		return $field;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * get the name of the table alias
+	 *
+	 * @param	string	$model		name of the model to lookup
+	 * @param	bool	$protect	if true, the alias will be protected
+	 *
+	 * @return	string	alias, or the current models table if not found
+	 */
+	public function dm_table_alias($model, $protect = FALSE)
+	{
+		$alias = isset(DataMapper::$dm_table_aliases[$model]) ? DataMapper::$dm_table_aliases[$model] : $this->dmconfig['table'];
+		return $protect ? $this->db->protect_identifiers($alias) : $alias;
 	}
 
 	// --------------------------------------------------------------------
@@ -2383,7 +2421,7 @@ class DataMapper implements IteratorAggregate
 	 *
 	 * @return	string	last db query formatted as a string
 	 */
-	public function check_last_query($delims = array('<pre>', '</pre>'), $return_as_string = FALSE)
+	public function check_last_query($delims = array('<hr /><pre>', '</pre><hr />'), $return_as_string = FALSE)
 	{
 		$q = wordwrap($this->db->last_query(), 100, "\n\t");
 		if ( ! empty($delims) )
@@ -2603,7 +2641,7 @@ die($TODO = 'get_sql(): handle related queries');
 		}
 
 		$this->db->dm_call_method('_track_aliases', $this->dm_config['table']);
-		$this->db->from($this->dm_config['table']);
+		$this->db->from($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE));
 
 		$this->dm_default_order_by();
 
@@ -2640,7 +2678,7 @@ die($TODO = 'get_raw(): handle related queries');
 
 		$this->dm_default_order_by();
 
-		$query = $this->db->get($this->dm_config['table'], $limit, $offset);
+		$query = $this->db->get($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE), $limit, $offset);
 		$this->dm_clear_after_query();
 
 		return $query;
@@ -2796,7 +2834,7 @@ die($TODO = 'get_raw(): handle related queries');
 	{
 		if ( ! empty($this->dm_config['order_by']) )
 		{
-			$sel = $this->dm_config['table'] . '.' . '*';
+			$sel = $this->add_table_name('*');
 			$sel_protect = $this->db->protect_identifiers($sel);
 
 			// only add the items if there isn't an existing order_by,
@@ -3042,9 +3080,6 @@ die($TODO = 'deal with the new keys structure');
 		// in case some include_related instantiations were set up, clear them
 		$this->dm_values['instantiations'] = NULL;
 
-		// Clear the query related list (Thanks to TheJim)
-		$this->dm_values['query_related'] = array();
-
 		// Clear the saved iterator
 		unset($this->dm_dataset_iterator);
 	}
@@ -3208,7 +3243,7 @@ die($TODO = 'deal with the new keys structure');
 			$keys = array();
 			foreach ( $selection as $name => $value )
 			{
-				$keys[$other_relation['my_table'].'.'.$name] = $value;
+				$keys[$this->dm_table_alias($other_relation['my_class']).'.'.$name] = $value;
 			}
 
 			// add the selection to the query
@@ -3244,7 +3279,7 @@ die($TODO = 'deal with the new keys structure');
 		// force the selection of the current object's columns
 		if (empty($this->db->ar_select))
 		{
-			$this->db->select($this->dm_config['table'] . '.*');
+			$this->db->select($this->add_table_name('*'));
 		}
 
 		// many-to-many relationship
@@ -3256,44 +3291,30 @@ die($TODO = 'deal with the new keys structure');
 				throw new DataMapper_Exception("DataMapper: '".$modela['related_class']."' and '".$modelb['my_class']."' must define the same join table");
 			}
 
-			$alias1 = $modela['join_table'].'_'.$modela['my_table'];
-			if ( ! in_array($alias1, $this->dm_values['query_related']) )
+			// build the join condition
+			$cond = '';
+			for ( $i = 0; $i < count($modela['my_key']); $i++ )
+			{
+				$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['join_table'].'.'.$modela['related_key'][$i];
+				$cond .= ' = ' . $this->dm_table_alias($modela['my_class']).'.'.$modela['my_key'][$i];
+			}
+
+			// join modela to the join table
+			$this->db->join($modela['join_table'], $cond, 'LEFT OUTER');
+
+			// join modelb to the join table
+			if ( $join_only === FALSE )
 			{
 				// build the join condition
 				$cond = '';
-				for ( $i = 0; $i < count($modela['my_key']); $i++ )
+				for ( $i = 0; $i < count($modelb['my_key']); $i++ )
 				{
-					$cond .= ( empty($cond) ? '' : ' AND ' ) . $alias1.'.'.$modela['related_key'][$i];
-					$cond .= ' = ' . $modela['my_table'].'.'.$modela['my_key'][$i];
+					$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['join_table'].'.'.$modelb['related_key'][$i];
+					$cond .= ' = ' . $this->dm_table_alias($modelb['my_class']).'.'.$modelb['my_key'][$i];
 				}
 
 				// join modela to the join table
-				$this->db->join($modela['join_table'].' '.$this->db->protect_identifiers($alias1), $cond, 'LEFT OUTER');
-
-				// record this alias
-				$this->dm_values['query_related'][] = $alias1;
-			}
-
-			$alias2 = $modelb['my_table'];
-			if ( ! in_array($alias2, $this->dm_values['query_related']) )
-			{
-				// join modelb to the join table
-				if ( $join_only === FALSE )
-				{
-					// build the join condition
-					$cond = '';
-					for ( $i = 0; $i < count($modelb['my_key']); $i++ )
-					{
-						$cond .= ( empty($cond) ? '' : ' AND ' ) . $alias1.'.'.$modelb['related_key'][$i];
-						$cond .= ' = ' . $alias2.'.'.$modelb['my_key'][$i];
-					}
-
-					// join modela to the join table
-					$this->db->join($modelb['my_table'].' '.$this->db->protect_identifiers($alias2), $cond, 'LEFT OUTER');
-				}
-
-				// record this alias
-				$this->dm_values['query_related'][] = $alias2;
+				$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['my_class'], TRUE), $cond, 'LEFT OUTER');
 			}
 		}
 
@@ -3330,42 +3351,23 @@ die('one-to-one 1');
 		// one-to-one relationship
 		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' )
 		{
-var_dump('MODEL-A');
-var_dump($modela);
-var_dump('MODEL-B');
-var_dump($modelb);
-die('one-to-one 2');
-			// check for a self-reference
-			if ( $modela['my_table'] == $modelb['my_table'] )
+			// build the join condition
+			$cond = '';
+			for ( $i = 0; $i < count($modelb['my_key']); $i++ )
 			{
-				$alias = $modela['my_table'].'_'.$modelb['my_table'];
-			}
-			else
-			{
-				$alias = $modelb['my_table'];
+				$cond .= ( empty($cond) ? '' : ' AND ' ) . $this->dm_table_alias($modela['my_class']).'.'.$modelb['related_key'][$i];
+				$cond .= ' = '.$this->dm_table_alias($modelb['my_class']).'.'.$modelb['my_key'][$i];
 			}
 
-			if ( ! in_array($alias, $this->dm_values['query_related']) )
-			{
-				// build the join condition
-				$cond = '';
-				for ( $i = 0; $i < count($modelb['my_key']); $i++ )
-				{
-					$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['my_table'].'.'.$modelb['related_key'][$i];
-					$cond .= ' = ' . $alias.'.'.$modelb['my_key'][$i];
-				}
-
-				// join modela to the join table
-				$this->db->join($modelb['my_table'].' '.$this->db->protect_identifiers($alias), $cond, 'LEFT OUTER');
-			}
+			// join modela to the join table
+			$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['my_class'], TRUE), $cond, 'LEFT OUTER');
 		}
 
-		// incompatible combination
+		// incompatible combination, bail out
 		else
 		{
 			throw new DataMapper_Exception("DataMapper: incompatible relation detected between '".$modela['related_class']."[".$modela['type']."]' and '".$modelb['my_class']."[".$modelb['type']."]'");
 		}
-
 	}
 
 	// -------------------------------------------------------------------------
@@ -3396,9 +3398,6 @@ die('one-to-one 2');
 
 		// need to clear query from the clone
 		$object->db->dm_call_method('_reset_select');
-
-		// clear the query related list from the clone
-		$object->dm_values['query_related'] = array();
 
 		// construct the iterator object
 		$this->dm_dataset_iterator = new DataMapper_DatasetIterator($object, $this->get_raw($limit, $offset, TRUE));

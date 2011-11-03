@@ -47,3 +47,9 @@ config:
 -> config : all_array_uses_ids is now called all_array_uses_keys
 -> config : new item 'cache_expiration', defined in seconds, or 0/NULL/FALSE if cache does not expire (= pre-2.0 default)
 -> config : new item 'free_result_threshold' (was a model class property before)
+
+Documentation notes:
+--------------------
+
+$this->db usage:
+-> if db_params is any other then FALSE, chained selections ( $a->where(this)->$b->where(that)->get() ) won't work, because $a and $b use different db objects that don't share their QB data!
