@@ -678,6 +678,7 @@ class DataMapper implements IteratorAggregate
 								empty($relations['my_class']) AND $relations['my_class'] = $object->dm_config['model'];
 								empty($relations['my_table']) AND $relations['my_table'] = $object->dm_config['table'];
 								empty($relations['related_class']) AND $relations['related_class'] = $relation;
+								empty($relations['related_model']) AND $relations['related_model'] = $object->dm_config['model'];
 								if ( empty($relations['join_table']) )
 								{
 									$relations['join_table'] = ( $relation < $relations['my_class'] ) ? plural($relation).'_'.plural($relations['my_class']) : plural($relations['my_class']).'_'.plural($relation);
@@ -1685,6 +1686,12 @@ class DataMapper implements IteratorAggregate
 
 		// clear the saved iterator
 		$this->dm_dataset_iterator = NULL;
+
+		// clear any saved values
+		$this->dm_values = array(
+			'parent' => NULL,
+			'instantiations' =>NULL,
+		);
 
 		$this->dm_refresh_original_values();
 
@@ -3314,42 +3321,29 @@ die($TODO = 'deal with the new keys structure');
 				}
 
 				// join modela to the join table
-				$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['my_class'], TRUE), $cond, 'LEFT OUTER');
+				$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['related_model'], TRUE), $cond, 'LEFT OUTER');
 			}
 		}
 
-		// many-to-one relationship
-		elseif ( $modela['type'] == 'has_many' AND $modelb['type'] == 'belongs_to' )
+		// many-to-one relationship, or one-to-one relationship, child -> parent
+		elseif ( ( $modela['type'] == 'has_many' AND $modelb['type'] == 'belongs_to' )
+			OR ( $modela['type'] == 'has_one' AND $modelb['type'] == 'belongs_to' ) )
 		{
-var_dump('MODEL-A');
-var_dump($modela);
-var_dump('MODEL-B');
-var_dump($modelb);
-die('many-to-one');
+			// build the join condition
+			$cond = '';
+			for ( $i = 0; $i < count($modelb['my_key']); $i++ )
+			{
+				$cond .= ( empty($cond) ? '' : ' AND ' ) . $this->dm_table_alias($modela['related_model']).'.'.$modela['my_key'][$i];
+				$cond .= ' = '.$this->dm_table_alias($modelb['related_model']).'.'.$modela['related_key'][$i];
+			}
+
+			// join with modela
+			$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['related_model'], TRUE), $cond, 'LEFT OUTER');
 		}
 
-		// one-to-many relationship
-		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_many' )
-		{
-var_dump('MODEL-A');
-var_dump($modela);
-var_dump('MODEL-B');
-var_dump($modelb);
-die('one-to-many');
-		}
-
-		// one-to-one relationship
-		elseif ( $modela['type'] == 'has_one' AND $modelb['type'] == 'belongs_to' )
-		{
-var_dump('MODEL-A');
-var_dump($modela);
-var_dump('MODEL-B');
-var_dump($modelb);
-die('one-to-one 1');
-		}
-
-		// one-to-one relationship
-		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' )
+		// one-to-many relationship, or one-to-one relationship, parent -> child
+		elseif ( ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_many' )
+			OR ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' ) )
 		{
 			// build the join condition
 			$cond = '';
@@ -3359,8 +3353,8 @@ die('one-to-one 1');
 				$cond .= ' = '.$this->dm_table_alias($modelb['my_class']).'.'.$modelb['my_key'][$i];
 			}
 
-			// join modela to the join table
-			$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['my_class'], TRUE), $cond, 'LEFT OUTER');
+			// join with modelb
+			$this->db->join($modelb['my_table'].' '.$this->dm_table_alias($modelb['related_model'], TRUE), $cond, 'LEFT OUTER');
 		}
 
 		// incompatible combination, bail out

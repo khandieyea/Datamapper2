@@ -165,5 +165,18 @@ class DataMapper_Tests_Singlekeys
 
 		self::$dmtesta->clear()->where('id', 1)->selfref->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtesta->selfref->all_to_array(), $expected_result, 'self::$dmtesta->clear()->where("id", 1)->selfref->get() self related records');
+
+		// getting self referenced results of dmtesta, related to selfref.id = 2
+
+		$expected_result = array(
+			array(
+				'id' => 1,
+				'fk_id_A' => 0,
+				'data_A' => 'Table A Row 1',
+			),
+		);
+
+		self::$dmtesta->selfref->clear()->where('id', 2)->dmtesta->get();
+		$result = DataMapper_Tests::assertEqual(self::$dmtesta->selfref->dmtesta->all_to_array(), $expected_result, 'self::$dmtesta->selfref->clear()->where("id", 2)->dmtesta->get() self related records');
 	}
 }

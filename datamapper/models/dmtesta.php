@@ -46,6 +46,7 @@ class DmtestA extends DataMapper
 	// insert models that this model belongs to
 	protected $belongs_to = array(
 		'dmtesta' => array(
+			'related_model' => 'selfref',
 		),
 	);
 
