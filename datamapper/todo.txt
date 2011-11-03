@@ -1,0 +1,23 @@
+DataMapper v2 Todo:
+==================
+
+-> remaining API functionality
+   - save
+   - delete
+   - update
+   - truncate
+   - all internal validation functions
+   - count (and variations)
+   - pages methods
+   - func support
+   - subquery support
+   - include related methods
+   - join field methods
+
+-> adding support for soft_delete:
+   - update delete_field instead of delete record
+   - include where(delete_field IS NULL) in queries
+   - NOTE: do we need an undelete?
+   - NOTE: do we need to be able to selected deleted records?
+
+
