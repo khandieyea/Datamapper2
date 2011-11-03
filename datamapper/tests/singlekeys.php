@@ -83,7 +83,7 @@ class DataMapper_Tests_Singlekeys
 		// fetch the first record and validate the result
 
 		self::$dmtesta->where('id', 1)->get();
-		$result = DataMapper_Tests::assertEqual(self::$dmtesta->to_array(), array('id' => 1, 'data_A' => 'Table A Row 1'), 'self::$dmtesta get() first record');
+		$result = DataMapper_Tests::assertEqual(self::$dmtesta->to_array(), array('id' => 1, 'fk_id_A' => 0, 'data_A' => 'Table A Row 1'), 'self::$dmtesta get() first record');
 
 		self::$dmtestb->where('id', 1)->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtestb->to_array(), array('id' => 1, 'data_B' => 'Table B Row 1'), 'self::$dmtestb get() first record');
@@ -103,7 +103,7 @@ class DataMapper_Tests_Singlekeys
 	 */
 	public function simple_related()
 	{
-		// fetch the records in dmtestb related to dmtesta, id = 1
+		// getting simple child relations, fetch the records in dmtestb related to dmtesta, id = 1
 
 		$expected_result = array(
 			array(
@@ -123,7 +123,7 @@ class DataMapper_Tests_Singlekeys
 		self::$dmtesta->dmtestb->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->all_to_array(), $expected_result, 'self::$dmtesta->dmtestb->get() related records');
 
-		// fetch the records with id = 2 in dmtestb related to dmtesta, id = 1
+		// getting simple child relations, fetch the records with id = 2 in dmtestb related to dmtesta, id = 1
 
 		$expected_result = array(
 			array(
@@ -135,11 +135,23 @@ class DataMapper_Tests_Singlekeys
 		self::$dmtesta->dmtestb->where('id', 2)->get();
 		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->all_to_array(), $expected_result, 'self::$dmtesta->dmtestb->where("id", 2)->get() related records');
 
+		// getting simple grandchild relations, fetch the records of dmteste related to dmtestb.id = 2 related to dmtesta.id = 1
+
 		$expected_result = array(
+			array(
+				'id' => 2,
+				'fk_id_B' => 2,
+				'data_E' => 'Table E Row 1 FK B_2',
+			),
 		);
 
-		self::$dmtesta->clear()->where('id', 1)->dmtestb->where('id', 3)->dmteste->get();
+		self::$dmtesta->clear()->where('id', 1)->dmtestb->where('id', 2)->dmteste->get();
+self::$dmtesta->dmtestb->dmteste->check_last_query();
 		$result = DataMapper_Tests::assertEqual(self::$dmtesta->dmtestb->dmteste->all_to_array(), $expected_result, 'self::$dmtesta->clear()->where("id", 1)->dmtestb->where("id", 3)->dmteste->get() related records');
 
+		// getting self referenced results of dmtesta, related to dmtesta.id = 1
+		self::$dmtesta->clear()->where('id', 1)->selfref->get();
+self::$dmtesta->selfref->check_last_query();
+var_dump(self::$dmtesta->clear()->where('id', 1)->selfref->all_to_array());
 	}
 }

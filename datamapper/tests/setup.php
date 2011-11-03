@@ -60,23 +60,24 @@ class DataMapper_Tests_Setup
 	 */
 	public function tables()
 	{
-		// drop our test tables
+		// drop our test tables to be sure, we need predictable data for our tests
 		self::$CI->dbforge->drop_table('dmtests_A');
 		self::$CI->dbforge->drop_table('dmtests_B');
 		self::$CI->dbforge->drop_table('dmtests_C');
 		self::$CI->dbforge->drop_table('dmtests_D');
 		self::$CI->dbforge->drop_table('dmtests_E');
 
-		// create our test tables : standard table A
+		// create our test tables : table A with self-referencing in-table-foreign-key
 		self::$CI->dbforge->add_field("id int(11) NOT NULL AUTO_INCREMENT");
+		self::$CI->dbforge->add_field("fk_id_A int(11) NOT NULL DEFAULT 0");
 		self::$CI->dbforge->add_field("data_A varchar(50) NOT NULL DEFAULT ''");
 		self::$CI->dbforge->add_key("id", TRUE);
 		self::$CI->dbforge->create_table('dmtests_A', TRUE);
 
 		// add test data to table A
-		self::$CI->db->insert('dmtests_A', array('data_A' => 'Table A Row 1'));
-		self::$CI->db->insert('dmtests_A', array('data_A' => 'Table A Row 2'));
-		self::$CI->db->insert('dmtests_A', array('data_A' => 'Table A Row 3'));
+		self::$CI->db->insert('dmtests_A', array('fk_id_A' => 0, 'data_A' => 'Table A Row 1'));
+		self::$CI->db->insert('dmtests_A', array('fk_id_A' => 1, 'data_A' => 'Table A Row 2'));
+		self::$CI->db->insert('dmtests_A', array('fk_id_A' => 1, 'data_A' => 'Table A Row 3'));
 
 		// create our test tables : standard table B
 		self::$CI->dbforge->add_field("id int(11) NOT NULL AUTO_INCREMENT");

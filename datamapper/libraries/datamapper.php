@@ -91,6 +91,8 @@ class DataMapper implements IteratorAggregate
 		'model_suffix' 				=> '',
 		'created_field'				=> 'created',
 		'updated_field'				=> 'updated',
+		'delete_field'				=> 'deleted',
+		'delete_uses_timestamp'		=> FALSE,
 		'local_time'				=> FALSE,
 		'unix_timestamp'			=> TRUE,
 		'timestamp_format'			=> '',
@@ -344,6 +346,7 @@ class DataMapper implements IteratorAggregate
 				case 'error_suffix':
 				case 'created_field':
 				case 'updated_field':
+				case 'delete_field':
 				case 'model_prefix':
 				case 'model_suffix':
 				case 'timestamp_format':
@@ -365,6 +368,7 @@ class DataMapper implements IteratorAggregate
 				case 'all_array_uses_keys':
 				case 'cascade_delete':
 				case 'extension_overload':
+				case 'delete_uses_timestamp':
 					if ( ! is_bool($value) )
 					{
 						throw new DataMapper_Exception("DataMapper: Error in the '$context' configuration => item '$name' must be a boolean value");
@@ -442,15 +446,23 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected static function dm_configure_model(&$object)
 	{
-		// fetch and prep the model class name
-		$model_class = strtolower(get_class($object));
+		// determine the name of the model we're configuring
+		if ( isset($object->model) AND is_string($object->model) AND ! empty($object->model) )
+		{
+			$model_class = $object->model;
+		}
+		else
+		{
+			// fetch and prep the model class name
+			$model_class = singular(strtolower(get_class($object)));
+		}
 
 		// this is to ensure that this is only done once per model
 		if ( ! isset(DataMapper::$dm_model_config[$model_class]) )
 		{
 			// setup the model config
 			DataMapper::$dm_model_config[$model_class] = array(
-				'model'		=> singular($model_class),
+				'model'		=> $model_class,
 				'table'		=> plural($model_class),
 				'keys'		=> array('id' => 'integer'),
 				'fields'	=> array(),
@@ -527,13 +539,7 @@ class DataMapper implements IteratorAggregate
 				DataMapper::dm_load_extensions($config['config']['extensions'], $config['config']['extension_overload']);
 				unset($config['config']['extensions']);
 
-				// check if we have a custom model name
-				if ( isset($object->model) AND is_string($object->model) AND ! empty($object->model) )
-				{
-					$config['model'] = $object->model;
-				}
-
-				// check if we have a custom table name
+				// check if we have a custom table name ( needed if plural(class) fails )
 				if ( isset($object->table) AND is_string($object->table) AND ! empty($object->table) )
 				{
 					$config['table'] = $object->table;
@@ -937,7 +943,7 @@ class DataMapper implements IteratorAggregate
 
 	// -------------------------------------------------------------------------
 
-	public function __construct($param = NULL)
+	public function __construct($param = NULL, $modelname = NULL)
 	{
 		// when first called, initialize datamapper itself
 		if ( ! DataMapper::$dm_initialized )
@@ -994,6 +1000,9 @@ class DataMapper implements IteratorAggregate
 		// else it's a model object instantiation
 		else
 		{
+			// do we have a custom modelname passed
+			is_null($modelname) OR $this->model = $modelname;
+
 			// setup a local copy of the model config
 			DataMapper::dm_configure_model($this);
 
@@ -1131,7 +1140,7 @@ class DataMapper implements IteratorAggregate
 		{
 			// instantiate the related object
 			$class = $related_object['related_class'];
-			$this->{$name} = new $class($this);
+			$this->dm_current->{$name} = new $class($this, $name);
 
 			return $this->dm_current->{$name};
 		}
@@ -1429,7 +1438,7 @@ class DataMapper implements IteratorAggregate
 			}
 			else
 			{
-				$TODO = 'Make a decision on dealing with this or not...';
+				$TODO = 'Make a decision on dealing with this or not... Version 1.x didnt';
 //				throw new DataMapper_Exception('DataMapper: called get() on an empty validated object');
 			}
 		}
@@ -2687,7 +2696,7 @@ die($TODO = 'get_raw(): handle related queries');
 	// --------------------------------------------------------------------
 
 	/**
-	 * used several places to temporarily override the auto_populate setting
+	 * locate the relationship definition based on the relation name
 	 *
 	 * @ignore
 	 *
@@ -2697,11 +2706,13 @@ die($TODO = 'get_raw(): handle related queries');
 	 */
 	public function dm_find_relationship($relation)
 	{
+		// if an object is passed, search on the objects model name
 		if ( $relation instanceOf DataMapper )
 		{
-			$relation = strtolower(get_class($relation));
+			$relation = $relation->dm_get_config('model');
 		}
 
+		// find the relationship definition for this relation
 		foreach ( $this->dm_config['relations'] as $type => $definitions )
 		{
 			foreach ( $definitions as $name => $definition )
@@ -3094,9 +3105,8 @@ die($TODO = 'deal with the new keys structure');
 					$keys[$key] = $this->dm_values['parent']['object']->{$key};
 				}
 			}
-
-			// to ensure result integrity, group all previous queries
-			if ( ! empty($this->db->ar_where) )
+			// to ensure result integrity, group all previous queries if needed
+			if ( ! empty($this->db->ar_where) AND $this->db->ar_where[0] != '( ' )
 			{
 				array_unshift($this->db->ar_where, '( ');
 				$this->db->ar_where[] = ' )';
@@ -3146,11 +3156,11 @@ die($TODO = 'deal with the new keys structure');
 			{
 				// find out what the relation is
 				$related_field = array_shift($arguments);
-
 				if ( ! $relation = $this->dm_find_relationship($related_field) )
 				{
 					throw new DataMapper_Exception("DataMapper: Unable to relate '{$this->dm_config['model']}' with '$related_field'");
 				}
+
 				$class = $relation['related_class'];
 
 				// no selection arguments present
@@ -3246,7 +3256,7 @@ die($TODO = 'deal with the new keys structure');
 				throw new DataMapper_Exception("DataMapper: '".$modela['related_class']."' and '".$modelb['my_class']."' must define the same join table");
 			}
 
-			$alias1 = $modela['join_table'];
+			$alias1 = $modela['join_table'].'_'.$modela['my_table'];
 			if ( ! in_array($alias1, $this->dm_values['query_related']) )
 			{
 				// build the join condition
@@ -3294,7 +3304,7 @@ var_dump('MODEL-A');
 var_dump($modela);
 var_dump('MODEL-B');
 var_dump($modelb);
-			die('many-to-one');
+die('many-to-one');
 		}
 
 		// one-to-many relationship
@@ -3304,7 +3314,7 @@ var_dump('MODEL-A');
 var_dump($modela);
 var_dump('MODEL-B');
 var_dump($modelb);
-			die('one-to-many');
+die('one-to-many');
 		}
 
 		// one-to-one relationship
@@ -3314,13 +3324,27 @@ var_dump('MODEL-A');
 var_dump($modela);
 var_dump('MODEL-B');
 var_dump($modelb);
-			die('one-to-one 1');
+die('one-to-one 1');
 		}
 
 		// one-to-one relationship
 		elseif ( $modela['type'] == 'belongs_to' AND $modelb['type'] == 'has_one' )
 		{
-			$alias = $modelb['my_table'];
+var_dump('MODEL-A');
+var_dump($modela);
+var_dump('MODEL-B');
+var_dump($modelb);
+die('one-to-one 2');
+			// check for a self-reference
+			if ( $modela['my_table'] == $modelb['my_table'] )
+			{
+				$alias = $modela['my_table'].'_'.$modelb['my_table'];
+			}
+			else
+			{
+				$alias = $modelb['my_table'];
+			}
+
 			if ( ! in_array($alias, $this->dm_values['query_related']) )
 			{
 				// build the join condition

@@ -28,6 +28,10 @@ class DmtestA extends DataMapper
 	protected $has_one = array(
 		'dmtestd' => array(
 			'related_key' => array('fk_id_A'),
+		),
+		'selfref' => array(
+			'related_class' => 'dmtesta',
+			'related_key' => array('fk_id_A'),
 		)
 	);
 
@@ -40,11 +44,19 @@ class DmtestA extends DataMapper
 	);
 
 	// insert models that this model belongs to
-	protected $belongs_to = array();
+	protected $belongs_to = array(
+		'dmtesta' => array(
+		),
+	);
 
 	// define validation rules for each column
 	protected $validation = array(
 		'id' => array(
+			'get_rules' => array(
+				'intval',
+			),
+		),
+		'fk_id_A' => array(
 			'get_rules' => array(
 				'intval',
 			),
@@ -67,11 +79,11 @@ class DmtestA extends DataMapper
 	 * Note that if you don't need a constructor here, remove this, as it
 	 * only introduces additional overhead.
 	 */
-	public function __construct($id = NULL)
+	public function __construct($param = NULL, $name = NULL)
 	{
 		// call the parent constructor to initialize the model
-		parent::__construct($id);
-    }
+		parent::__construct($param, $name);
+	}
 
 	// --------------------------------------------------------------------
 

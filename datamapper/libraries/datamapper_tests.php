@@ -3,7 +3,7 @@
 /**
  * Data Mapper ORM Class
  *
- * Run the Datamapper test framework
+ * Datamapper test framework
  *
  * @license     MIT License
  * @package     DataMapper ORM
@@ -17,12 +17,6 @@
  * shortcut for the directory separator
  */
 ! defined('DS') AND define('DS', DIRECTORY_SEPARATOR);
-
-// -------------------------------------------------------------------------
-// Register the DataMapper autoloader
-// -------------------------------------------------------------------------
-
-spl_autoload_register('DataMapper_Tests::dm_autoload');
 
 // -------------------------------------------------------------------------
 // Core tests class
@@ -78,6 +72,9 @@ class DataMapper_Tests
 	{
 		// get the CI instance
 		self::$CI = get_instance();
+
+		// load the profiler library, with a custom config (we need to see queries!)
+		self::$CI->load->library('profiler', array('query_toggle_count' => 999999));
 
 		// enable the profiler
 		self::$CI->output->enable_profiler(TRUE);
@@ -357,10 +354,8 @@ class DataMapper_Tests
 	}
 }
 
-// Run Tests, Run!!!
+// -------------------------------------------------------------------------
+// Register the DataMapper test packages autoloader
+// -------------------------------------------------------------------------
 
-DataMapper_Tests::run();
-
-
-/* End of file datamapper_tests.php */
-/* Location: ./application/third_party/datamapper/helper/datamapper_tests_helper.php */
+spl_autoload_register('DataMapper_Tests::dm_autoload');

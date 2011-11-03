@@ -42,8 +42,11 @@ You can run the test framework by creating a new controller, and add this to the
 		// add the datamapper package
 		$this->load->add_package_path(APPPATH.'third_party/datamapper');
 
-		// and run the test framework
-		$this->load->helper('datamapper_tests');
+		// load the test framework
+		$this->load->library('datamapper_tests');
+
+		// and run the tests
+		DataMapper_Tests::run();
 
 
 The MIT License

@@ -65,11 +65,11 @@ class Dmteste extends DataMapper
 	 * Note that if you don't need a constructor here, remove this, as it
 	 * only introduces additional overhead.
 	 */
-	public function __construct($id = NULL)
+	public function __construct($param = NULL, $name = NULL)
 	{
 		// call the parent constructor to initialize the model
-		parent::__construct($id);
-    }
+		parent::__construct($param, $name);
+	}
 
 	// --------------------------------------------------------------------
 
