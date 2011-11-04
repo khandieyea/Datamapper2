@@ -30,14 +30,14 @@ model:
    others are deprecated, and will be removed in v2.1 (a notice will be written in the logs)
 -> no more short or simple relationship definitions, as key names can not be guessed anymore
    $relation_type = array(
-       'relationship_name' => array(			// required, usually the name of the related model class
-           'my_key' => array('field')			// optional, the keys in this table for this relation, defaults to $config['keys']
-           'my_class' => 'classname'			// optional, defaults to $config['model']
-           'related_class' => 'classname'		// optional, the class of the other side of the relationship, defaults to "relationship_name"
-           'related_model' => 'relationship_name'	// optional, the name of the other side of the relationship, defaults to "relationship_name"
-           'related_key' => array('field')		// required, defines my foreign keys in the other table or join table
-           'join_table' => 'tablename'			// optional, to force a join table on has_one/belongs_to relations, or to use a custom name on has_many
-           						// defaults to the alphabetical combination of relationship_name and my_class
+       'relationship_name' => array(				// required, usually the name of the related model class
+           'related_key' => array('field(s)')			// required, defines my foreign keys (column names) in the other table or join table
+           'related_class' => 'related_classname'		// optional, the class of the other side of the relationship, defaults to "relationship_name"
+           'related_model' => 'related_relationship_name'	// optional, the name of the other side of the relationship, defaults to "relationship_name"
+           'join_table' => 'tablename'				// optional, to use a custom name for the join table on has_many relations
+           							//           defaults to the alphabetical combination of the plural of relationship_name and my_class
+           'my_key' => array('field')				// optional, the keys in this table for this relation, defaults to $config['keys']
+           'my_class' => 'classname'				// optional, defaults to $config['model']
        )
    )
 

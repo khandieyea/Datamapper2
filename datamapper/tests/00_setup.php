@@ -29,10 +29,6 @@ class DataMapper_Tests_Setup
 
 		return array(
 			'title' => 'DataMapper Tests &raquo; Setup',
-			'first' => TRUE,
-			'last' => FALSE,
-			'before' => array(),
-			'after' => array(),
 			'methods' => array(
 				'database' => 'preparing the environment',
 				'tables' => 'creating test tables',

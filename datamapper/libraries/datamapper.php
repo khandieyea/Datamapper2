@@ -1298,10 +1298,11 @@ class DataMapper implements IteratorAggregate
 			}
 		}
 
+//		echo '<hr /';
+//		var_dump($method, $arguments);
+//		echo '<hr /';
+
 		// no mapping found, fail with the standard PHP error
-		echo '<hr /';
-		var_dump($method, $arguments);
-		echo '<hr /';
 		throw new DataMapper_Exception("Call to undefined method ".get_class($this)."::$method()");
 	}
 
@@ -1429,6 +1430,21 @@ class DataMapper implements IteratorAggregate
 
 		// unknown flag
 		return NULL;
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * set or reset an error message
+	 *
+	 * @param	string	$field		field name to set the message on
+	 * @param	string	$message	message
+	 *
+	 * @return	mixed	the value, or NULL if not found
+	 */
+	public function error_message($field, $message = '')
+	{
+		$this->error->message($field, $message);
 	}
 
 	// -------------------------------------------------------------------------

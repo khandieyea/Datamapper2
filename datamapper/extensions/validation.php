@@ -545,7 +545,31 @@ die($TODO = 're-code save validation rules');
 	 */
 	protected static function rule_trim($object, $field, $param = array())
 	{
-		empty($object->{$field}) OR $object->{$field} = trim($object->{$field});
+		is_null($object->{$field}) OR $object->{$field} = trim($object->{$field});
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * custom intval rule that ignores NULL values
+	 *
+	 * @ignore
+	 */
+	protected static function rule_intval($object, $field, $param = array())
+	{
+		is_null($object->{$field}) OR $object->{$field} = intval($object->{$field});
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * custom floatval rule that ignores NULL values
+	 *
+	 * @ignore
+	 */
+	protected static function rule_floatval($object, $field, $param = array())
+	{
+		is_null($object->{$field}) OR $object->{$field} = floatval($object->{$field});
 	}
 
 	// --------------------------------------------------------------------

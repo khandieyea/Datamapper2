@@ -29,10 +29,6 @@ class DataMapper_Tests_Breakdown
 
 		return array(
 			'title' => 'DataMapper Tests &raquo; Breakdown',
-			'first' => FALSE,
-			'last' => TRUE,
-			'before' => array(),
-			'after' => array(),
 			'methods' => array(
 //				'tables' => 'dropping test tables',
 			),

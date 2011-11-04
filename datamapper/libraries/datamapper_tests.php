@@ -51,9 +51,9 @@ class DataMapper_Tests
 		$class = strtolower($class);
 
 		// check for a datamapper core extension class
-		if ( strpos($class, 'datamapper_tests') === 0 )
+		if ( is_numeric(substr($class, 0, 2)) )
 		{
-			$file = realpath(__DIR__.DS.'..'.DS.'tests').DS.substr($class,17).EXT;
+			$file = realpath(__DIR__.DS.'..'.DS.'tests').DS.$class.EXT;
 			if ( file_exists($file) )
 			{
 				require_once($file);
@@ -101,54 +101,13 @@ class DataMapper_Tests
 		foreach ( $dir as $file )
 		{
 			$info = pathinfo($file);
-			$configs[$info['filename']] = call_user_func('DataMapper_Tests_'.ucfirst($info['filename']).'::_construct');
+			$class = 'DataMapper_Tests_'.ucfirst(substr($info['filename'],3));
+			class_exists($info['filename']);
+			$configs[$info['filename']] = call_user_func($class.'::_construct');
 		}
 
-		// and build a test plan
-		foreach ( $configs as $name => $config )
-		{
-			// store the class name inside the config
-			$config['name'] = $name;
-
-			// is this a setup class?
-			if ( ! empty($config['first']) )
-			{
-				if ( isset(self::$testplan['_first']) )
-				{
-					show_error('DataMapper Tests: There can only be one setup class defined!');
-				}
-				self::add($config, '_first');
-			}
-
-			// is this a breakdown class?
-			elseif ( ! empty($config['last']) )
-			{
-				if ( isset(self::$testplan['_last']) )
-				{
-					show_error('DataMapper Tests: There can only be one breakdown class defined!');
-				}
-				self::add($config, '_last');
-			}
-
-			// standard test class
-			else
-			{
-				// find out when we need to run this test
-				$offset = 1;
-
-				foreach( $config['before'] as $class )
-				{
-					var_dump($config);die();
-				}
-
-				foreach( $config['after'] as $class )
-				{
-					var_dump($config);die();
-				}
-
-				self::add($config, $name, $offset);
-			}
-		}
+		// make sure we hav the correct order of the tests
+		ksort($configs);
 
 		// benchmark
 		self::$CI->benchmark->mark('datamapper_tests_setup_end');
@@ -158,28 +117,39 @@ class DataMapper_Tests
 
 		// building done, time to start testing!
 		$counter = 0;
-		foreach ( self::$testplan as $name => $tests )
+		foreach ( $configs as $name => $tests )
 		{
+			// set the name
+			$tests['name'] = substr($name, 3);
+
 			// mark the start
 			self::mark(++$counter.' &raquo; '.$tests['title'], 3, TRUE);
 
 			// run the defined tests
-			foreach ( $tests['methods'] as $method => $title )
+			if ( ! empty($tests['methods']) AND is_array($tests['methods']) )
 			{
-				is_numeric($method) AND $method = $title;
-
-				self::mark('&raquo; '.$title, 4);
-
-				if ( $result = call_user_func('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) === FALSE )
+				foreach ( $tests['methods'] as $method => $title )
 				{
-					// bail out at a fatal error!
-					self::mark('Test aborted due to fatal error!', 3, true);
-					break 2;
-				}
-			}
+					is_numeric($method) AND $method = $title;
 
-			// mark the end
-			self::mark('&raquo; finished', 4, TRUE);
+					self::mark('&raquo; '.$title, 4);
+
+					if ( $result = call_user_func('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) === FALSE )
+					{
+						// bail out at a fatal error!
+						self::mark('Test aborted due to fatal error!', 3, true);
+						break 2;
+					}
+				}
+
+				// mark the end
+				self::mark('&raquo; finished', 4, TRUE);
+			}
+			else
+			{
+				// mark the end
+				self::mark('&raquo; no tests defined for this section', 4, TRUE);
+			}
 		}
 
 		// print the successes and failures
@@ -307,51 +277,6 @@ class DataMapper_Tests
 		}
 	}
 
-	// --------------------------------------------------------------------
-
-	/**
-	 * add a test config to the testplan
-	 *
-	 * @return	void
-	 */
-	protected static function add($config, $name, $offset = 1)
-	{
-		if ( $name == '_first' )
-		{
-			self::$testplan = array_merge( array('_first' => $config), self::$testplan );
-		}
-		elseif ( $name == '_last' )
-		{
-			self::$testplan['_last'] = $config;
-		}
-		else
-		{
-			$new = isset(self::$testplan['_first']) ? array('_first' => self::$testplan['_first']) : array();
-
-			$counter = 0;
-			foreach (self::$testplan as $class => $value )
-			{
-				if ( $class != '_first' AND $class != '_last')
-				{
-					if ( $counter == $offset )
-					{
-						$new[$name] = $config;
-					}
-					$new[$class] = $value;
-					$counter++;
-				}
-			}
-
-			if ( ! isset($new[$name]) )
-			{
-				$new[$name] = $config;
-			}
-
-			isset(self::$testplan['_last']) AND $new['_last'] = self::$testplan['_last'];
-
-			self::$testplan = $new;
-		}
-	}
 }
 
 // -------------------------------------------------------------------------

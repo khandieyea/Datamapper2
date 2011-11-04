@@ -96,7 +96,7 @@ class DataMapper_Errors {
 	 *
 	 * @ignore
 	 *
-	 * @return	void
+	 * @return	DataMapper_Errors object, for chaining
 	 */
 	public function clear()
 	{
@@ -124,11 +124,14 @@ class DataMapper_Errors {
 					unset($this->{$name});
 			}
 		}
+
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
+
 	/**
-	 * adds an error message to this objects error object
+	 * adds an error message to the objects error object
 	 *
 	 * @param	string	$field	field to set the error on
 	 * @param	string	$error	error message
@@ -141,7 +144,7 @@ class DataMapper_Errors {
 			$this->{$field} = $this->all[$field] = $this->dm_prefix . $error . $this->dm_suffix;
 
 			// append field error to error message string
-			$this->string .= $this->error->{$field};
+			$this->string .= $this->{$field};
 		}
 	}
 
