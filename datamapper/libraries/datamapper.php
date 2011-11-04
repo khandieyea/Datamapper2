@@ -633,6 +633,7 @@ class DataMapper implements IteratorAggregate
 				}
 
 				// set up validations for the keys, if not present
+				$get_rules =& $object->dm_config['validation']['get_rules'];
 				foreach ( $object->dm_config['keys'] as $name => $value )
 				{
 					if ( ! isset($associative_validation[$name]) )
@@ -641,17 +642,29 @@ class DataMapper implements IteratorAggregate
 							'field' => $name,
 							'rules' => array($value)
 						);
-						if ($value == 'integer')
+						switch ($value)
 						{
-							if ( isset($object->dm_config['validation']['get_rules'][$name]) )
-							{
-								! in_array('intval', $object->dm_config['validation']['get_rules'][$name]) AND $object->dm_config['validation']['get_rules'][$name][] = 'intval';
-							}
-							else
-							{
-								$object->dm_config['validation']['get_rules'][$name] = array('intval');
-							}
+							case 'integer':
+								$value = 'intval';
+								break;
+
+							case 'float':
+								$value = 'floatval';
+								break;
+
+							default:
+								continue;
 						}
+
+						if ( isset($get_rules[$name]) )
+						{
+							in_array($value, $get_rules[$name]) OR $get_rules[$name][] = $value;
+						}
+						else
+						{
+							$get_rules[$name] = array($value);
+						}
+						break;
 					}
 				}
 
