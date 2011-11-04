@@ -13,8 +13,8 @@
  * @version 	2.0.0
  */
 
-class DataMapper_Validation {
-
+class DataMapper_Validation
+{
 	/**
 	 * validates the value of each property against the assigned validation rules
 	 *
@@ -237,7 +237,7 @@ die($TODO = 're-code save validation rules');
 		// loop through each property to be validated
 		foreach ($dmobject->dm_get_config('validation', 'get_rules') as $field => $rules)
 		{
-			// only process non-empty keys that are not specifically set to be null
+			// only process non-empty fields that are not specifically set to be null
 			if ( ! isset($dmobject->{$field}) AND ! in_array('allow_null', $rules) )
 			{
 				continue;
@@ -262,26 +262,26 @@ die($TODO = 're-code save validation rules');
 				// is the rule in the datamapper object itself?
 				if ( method_exists($dmobject, 'rule_'.$rule) )
 				{
-					 $dmobject->{'rule_'.$rule}($dmobject->{$field}, $param);
+					$dmobject->{'rule_'.$rule}($field, $param);
 				}
 
 				// is the rule a datamapper extension validation method?
 				elseif ( $method = DataMapper::dm_is_extension_method('rule_'.$rule) )
 				{
-					$dmobject->{$method}($dmobject->{$field}, $param);
+					$dmobject->{$method}($dmobject, $field, $param);
 				}
 
 				// is the rule a datamapper core validation method?
 				elseif ( is_callable('self::rule_'.$rule) )
 				{
-					call_user_func_array('self::rule_'.$rule, array($dmobject->{$field}, $param));
+					call_user_func_array('self::rule_'.$rule, array($dmobject, $field, $param));
 				}
 
 				// is the rule a CI form validation method?
 				elseif ( method_exists(DataMapper::$CI->form_validation, $rule) )
 				{
-					// Run rule from CI Form Validation
-					DataMapper::$CI->form_validation->{$rule}($dmobject->{$field}, $param);
+					// run rule from CI Form Validation
+					$dmobject->{$field} = DataMapper::$CI->form_validation->{$rule}($dmobject->{$field}, $param);
 				}
 
 				// is the rule a defined function?
@@ -298,6 +298,279 @@ die($TODO = 're-code save validation rules');
 		}
 	}
 
+	// --------------------------------------------------------------------
+	// built-in validation rules
+	// --------------------------------------------------------------------
+
+	/**
+	 * does nothing, but forces a validation even if empty (for non-required fields)
+	 *
+	 * @ignore
+	 */
+	protected static function rule_always_validate($object, $field, $param = array())
+	{
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks whether the field value matches one of the specified array values
+	 *
+	 * @ignore
+	 */
+	protected static function rule_valid_match($object, $field, $param = array())
+	{
+		return in_array($object->{$field}, $param);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks whether the field value is a valid DateTime
+	 *
+	 * @ignore
+	 */
+	protected static function rule_valid_date($object, $field, $param = array())
+	{
+		// ignore if empty
+		if ( empty($object->{$field}) )
+		{
+			return TRUE;
+		}
+
+		$date = date_parse($field);
+
+		return checkdate($date['month'], $date['day'],$date['year']);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks whether the field value, grouped with other field values, is a valid DateTime
+	 *
+	 * @ignore
+	 */
+	protected static function rule_valid_date_group($object, $field, $param = array())
+	{
+		// ignore if empty
+		if ( empty($object->{$field}) )
+		{
+			return TRUE;
+		}
+
+		$date = date_parse($fields['year'] . '-' . $fields['month'] . '-' . $fields['day']);
+
+		return checkdate($date['month'], $date['day'],$date['year']);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks if the value of a property is unique in the table
+ 	 *
+	 * @ignore
+	 */
+	protected static function rule_unique($object, $field, $param = array())
+	{
+		$match = TRUE;
+
+		if ( ! empty($object->{$field}) )
+		{
+			// run the query to check
+			$query = $object->db->get_where($object->dm_get_config('table'), array( $field => $object->{$field} ), 1, 0);
+
+			if ($query->num_rows() > 0)
+			{
+				$row = $query->row();
+
+				// if unique, the keys should not match
+				foreach ( $object->dm_get_config('keys') as $key => $unused )
+				{
+					if ( $object->{$key} != $row->{$key} )
+					{
+						$match = FALSE;
+						break;
+					}
+				}
+			}
+		}
+
+		return $match;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks if the value of a property, paired with another, is unique in the table
+	 *
+	 * @ignore
+	 */
+	protected static function rule_unique_pair($object, $field, $other_field = '')
+	{
+		$match = TRUE;
+
+		if ( ! empty($object->{$field}) AND ! empty($object->{$other_field}) )
+		{
+			// run the query to check
+			$query = $object->db->get_where($object->dm_get_config('table'), array($field => $object->{$field}, $other_field => $object->{$other_field}), 1, 0);
+
+			if ($query->num_rows() > 0)
+			{
+				$row = $query->row();
+
+				// if unique, the keys should not match
+				foreach ( $object->dm_get_config('keys') as $key => $unused )
+				{
+					if ( $object->{$key} != $row->{$key} )
+					{
+						$match = FALSE;
+						break;
+					}
+				}
+			}
+		}
+
+		return $match;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * alpha-numeric with underscores, dashes and full stops
+	 *
+	 * @ignore
+	 */
+	protected static function rule_alpha_dash_dot($object, $field, $param = array())
+	{
+		return ( ! preg_match('/^([\.-a-z0-9_-])+$/i', $object->{$field})) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * alpha-numeric with underscores, dashes, forward slashes and full stops
+	 *
+	 * @ignore
+	 */
+	protected static function rule_alpha_slash_dot($object, $field, $param = array())
+	{
+		return ( ! preg_match('/^([\.\/-a-z0-9_-])+$/i', $object->{$field})) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * match one field to another
+	 *
+	 * @ignore
+	 */
+	protected static function rule_matches($object, $field, $other_field)
+	{
+		return ($object->{$field} !== $object->{$other_field}) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks if the value of a property is at least the minimum date.
+	 *
+	 * @ignore
+	 */
+	protected static function rule_min_date($object, $field, $date)
+	{
+		return (strtotime($object->{$field}) < strtotime($date)) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks if the value of a property is at most the maximum date
+	 *
+	 * @ignore
+	 */
+	protected static function rule_max_date($object, $field, $date)
+	{
+		return (strtotime($object->{$field}) > strtotime($date)) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * checks if the value of a property is at least the minimum size
+	 *
+	 * @ignore
+	 */
+	protected static function rule_min_size($object, $field, $size)
+	{
+		return ($object->{$field} < $size) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * Max Size (pre-process)
+	 *
+	 * Checks if the value of a property is at most the maximum size.
+	 *
+	 * @ignore
+	 */
+	protected static function rule_max_size($object, $field, $size)
+	{
+		return ($object->{$field} > $size) ? FALSE : TRUE;
+	}
+
+	// --------------------------------------------------------------------
+	// built-in prep rules (which alter the field value)
+	// --------------------------------------------------------------------
+
+	/**
+	 * runs the data through the XSS filtering function, described in the Security Class page
+	 *
+	 * @ignore
+	 */
+	protected static function rule_xss_clean($object, $field, $is_image = FALSE)
+	{
+		// make sure the security library is loaded
+		isset(DataMapper::$CI->security) OR DataMapper::$CI->load->library('security');
+
+		$object->{$field} = DataMapper::$CI->security->xss_clean($object->{$field}, $is_image);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * custom trim rule that ignores NULL values
+	 *
+	 * @ignore
+	 */
+	protected static function rule_trim($object, $field, $param = array())
+	{
+		empty($object->{$field}) OR $object->{$field} = trim($object->{$field});
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * strips the HTML from image tags leaving the raw URL
+	 *
+	 * @ignore
+	 */
+	protected static function rule_strip_image_tags($object, $field, $param = array())
+	{
+		$object->{$field} = strip_image_tags($object->{$field});
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * forces a field to be either TRUE or FALSE
+	 *
+	 * @ignore
+	 */
+	protected static function rule_boolean($object, $field, $param = array())
+	{
+		$object->{$field} = (bool) $object->{$field};
+	}
 }
 
 /* End of file validation.php */

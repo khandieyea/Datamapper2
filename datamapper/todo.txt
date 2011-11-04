@@ -6,7 +6,7 @@ DataMapper v2 Todo:
    - delete
    - update
    - truncate
-   - all internal validation functions
+   x all internal validation functions
    - count (and variations)
    - pages methods
    - func support
