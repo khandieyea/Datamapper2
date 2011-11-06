@@ -11,8 +11,10 @@ DataMapper v2 Todo:
    - pages methods
    - func support
    - subquery support
+   x related query methods
    - include related methods
    - join field methods
+   - auto populate features
 
 -> adding support for soft_delete:
    - update delete_field instead of delete record

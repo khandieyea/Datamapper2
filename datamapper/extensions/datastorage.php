@@ -39,6 +39,15 @@ class DataMapper_Datastorage
 	{
 		return property_exists($this, strtolower($name));
 	}
+
+	/*
+	 * magic unsetter to deal with the now famous case issue
+	 */
+	public function __unset($name)
+	{
+		unset($this->{strtolower($name)});
+	}
+
 }
 
 /* End of file datastorage.php */
