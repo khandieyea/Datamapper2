@@ -42,11 +42,50 @@ class DataMapper_Tests_Models
 	{
 		// instantiate all test models
 
-		$dmtesta = new Dmtesta();
-		$dmtestb = new Dmtestb();
-		$dmtestc = new Dmtestc();
-		$dmtestd = new Dmtestd();
-		$dmteste = new Dmteste();
+		try
+		{
+			$dmtesta = new Dmtesta();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
+
+		try
+		{
+			$dmtestb = new Dmtestb();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
+
+		try
+		{
+			$dmtestc = new Dmtestc();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
+
+		try
+		{
+			$dmtestd = new Dmtestd();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
+
+		try
+		{
+			$dmteste = new Dmteste();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
 
 		if ( $dmtesta instanceOf DataMapper AND
 			$dmtestb instanceOf DataMapper AND

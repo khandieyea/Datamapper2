@@ -1482,6 +1482,9 @@ class DataMapper implements IteratorAggregate
 
 			if ( ! empty($data) )
 			{
+				// clear this objects selection
+				$this->db->dm_call_method('_reset_select');
+
 				// clear this object to make way for new data
 				$this->clear();
 
@@ -2326,30 +2329,42 @@ class DataMapper implements IteratorAggregate
 
 	/**
 	 * starts active record caching
+	 *
+	 * @return	DataMapper	returns self for method chaining
 	 */
 	public function start_cache()
 	{
 		$this->db->start_cache();
+
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
 
 	/**
 	 * stops active record caching
+	 *
+	 * @return	DataMapper	returns self for method chaining
 	 */
 	public function stop_cache()
 	{
 		$this->db->stop_cache();
+
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
 
 	/**
 	 * empties the active record cache
+	 *
+	 * @return	DataMapper	returns self for method chaining
 	 */
 	public function flush_cache()
 	{
 		$this->db->flush_cache();
+
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
@@ -2363,54 +2378,66 @@ class DataMapper implements IteratorAggregate
 	 */
 	public function add_table_name($field)
 	{
-		// deal with composed strings using AND or OR
-		if ( preg_match('/AND|OR/', $field) )
+		if ( is_array($field) )
 		{
-			$field_parts = explode('OR', $field);
-			if ( count($field_parts) > 1 )
+			$result = array();
+			foreach ( $field as $fieldname )
 			{
+				$result[] = $this->add_table_name($fieldname);
+			}
+			return $result;
+		}
+		else
+		{
+			// deal with composed strings using AND or OR
+			if ( preg_match('/AND|OR/', $field) )
+			{
+				$field_parts = explode('OR', $field);
+				if ( count($field_parts) > 1 )
+				{
+					$field = '';
+					foreach ( $field_parts as $part )
+					{
+						$field .= (empty($field) ? '' : ' OR ') . $this->add_table_name(trim($part));
+					}
+				}
+				$field_parts = explode('AND', $field);
+				if ( count($field_parts) > 1 )
+				{
+					$field = '';
+					foreach ( $field_parts as $part )
+					{
+						$field .= (empty($field) ? '' : ' AND ') . $this->add_table_name(trim($part));
+					}
+				}
+			}
+
+			// only add table if the field doesn't contain a dot (.) or open parentheses
+			if ( preg_match('/[\.\(]/', $field) == 0 )
+			{
+				// split string into parts, add field
+				$field_parts = explode(',', $field);
 				$field = '';
 				foreach ( $field_parts as $part )
 				{
-					$field .= (empty($field) ? '' : ' OR ') . $this->add_table_name(trim($part));
+					! empty($field) AND $field .= ', ';
+					$part = ltrim($part);
+
+					// handle comparison operators on where
+					$subparts = explode(' ', $part, 2);
+					if ( $subparts[0] == '*' OR in_array($subparts[0], $this->dm_config['fields']) )
+					{
+						$field .= $this->db->protect_identifiers($this->dm_table_alias($this->dm_config['model'])  . '.' . $part);
+					}
+					else
+					{
+						$field .= $part;
+					}
 				}
 			}
-			$field_parts = explode('AND', $field);
-			if ( count($field_parts) > 1 )
-			{
-				$field = '';
-				foreach ( $field_parts as $part )
-				{
-					$field .= (empty($field) ? '' : ' AND ') . $this->add_table_name(trim($part));
-				}
-			}
+
+			return $field;
 		}
-
-		// only add table if the field doesn't contain a dot (.) or open parentheses
-		if ( preg_match('/[\.\(]/', $field) == 0 )
-		{
-			// split string into parts, add field
-			$field_parts = explode(',', $field);
-			$field = '';
-			foreach ( $field_parts as $part )
-			{
-				! empty($field) AND $field .= ', ';
-				$part = ltrim($part);
-
-				// handle comparison operators on where
-				$subparts = explode(' ', $part, 2);
-				if ( $subparts[0] == '*' OR in_array($subparts[0], $this->dm_config['fields']) )
-				{
-					$field .= $this->db->protect_identifiers($this->dm_table_alias($this->dm_config['model'])  . '.' . $part);
-				}
-				else
-				{
-					$field .= $part;
-				}
-			}
-		}
-
-		return $field;
 	}
 
 	// --------------------------------------------------------------------

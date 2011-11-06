@@ -134,11 +134,18 @@ class DataMapper_Tests
 
 					self::mark('&raquo; '.$title, 4);
 
-					if ( $result = call_user_func('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) === FALSE )
+					if ( is_callable('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) )
 					{
-						// bail out at a fatal error!
-						self::mark('Test aborted due to fatal error!', 3, true);
-						break 2;
+						if ( $result = call_user_func('DataMapper_Tests_'.ucfirst($tests['name']).'::'.$method) === FALSE )
+						{
+							// bail out at a fatal error!
+							self::mark('Test aborted due to fatal error!', 3, true);
+							break 2;
+						}
+					}
+					else
+					{
+						self::failed('skipped, test method is not defined!', 5, true);
 					}
 				}
 
