@@ -159,6 +159,13 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected static $dm_table_aliases = array();
 
+	/**
+	 * storage for table aliases counter
+	 *
+	 * @var array
+	 */
+	protected static $alias_counter = 0;
+
 	// --------------------------------------------------------------------
 
 	/**
@@ -453,9 +460,6 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected static function dm_configure_model(&$object)
 	{
-		// to make sure every model/table has a unique alias number
-		static $alias_counter = 0;
-
 		// fetch and prep the model class name
 		$model_class = singular(strtolower(get_class($object)));
 
@@ -562,7 +566,7 @@ class DataMapper implements IteratorAggregate
 				$object->dm_config['table'] = $object->dm_config['config']['prefix'] . $object->dm_config['table'];
 
 				// store the alias for this model / table combination
-				DataMapper::$dm_table_aliases[$model] = 'DM_'.$alias_counter++;
+				DataMapper::$dm_table_aliases[$model] = 'DM_'.self::$alias_counter++;
 
 				// check if we have a custom primary keys
 				if ( isset($object->primary_key) AND is_array($object->primary_key) AND ! empty($object->primary_key) )
@@ -927,7 +931,6 @@ class DataMapper implements IteratorAggregate
 	 */
 	protected $dm_values = array(
 		'parent' => NULL,
-		'instantiations' =>NULL,
 	);
 
 	/**
@@ -1280,7 +1283,7 @@ class DataMapper implements IteratorAggregate
 					$new_method = 'dm_' . trim($watched_method, '_');
 					if ( ! method_exists($this, $new_method) )
 					{
-						die("Method '$new_method' does not exist. Avoiding recursive calls");
+						throw new DataMapper_Exception("DataMapper: Called method '$new_method' does not exist");
 					}
 					return $this->{$new_method}($pieces[0], array_merge(array($pieces[1]), $arguments));
 				}
@@ -1290,7 +1293,7 @@ class DataMapper implements IteratorAggregate
 					$new_method = 'dm_' . trim($watched_method, '_');
 					if ( ! method_exists($this, $new_method) )
 					{
-						die("Method '$method' does not exist. Avoiding recursive calls");
+						throw new DataMapper_Exception("DataMapper: Called method '$method' does not exist");
 					}
 					return $this->{$new_method}(str_replace($watched_method, '', $method), $arguments);
 					break;
@@ -1339,113 +1342,6 @@ class DataMapper implements IteratorAggregate
 		return ucfirst($this->dm_config['model']);
 	}
 
-
-	// -------------------------------------------------------------------------
-	// DataMapper public support methods
-	// -------------------------------------------------------------------------
-
-	/**
-	 * returns the value of a stored flag
-	 *
-	 * @param	string	$flag	name of the flag requested
-	 *
-	 * @return	mixed	the value of the flag, or NULL if not found
-	 */
-	public function dm_get_flag($flag)
-	{
-		if ( isset($this->dm_flags[$flag]) )
-		{
-			return $this->dm_flags[$flag];
-		}
-
-		// unknown flag
-		return NULL;
-	}
-
-	// -------------------------------------------------------------------------
-
-	/**
-	 * sets the value of a stored flag
-	 *
-	 * @param	string	$flag	name of the flag requested
-	 * @param	mixed	$flag	name of the flag requested
-	 *
-	 * @return	void
-	 */
-	public function dm_set_flag($flag, $value)
-	{
-		if ( isset($this->dm_flags[$flag]) )
-		{
-			$this->dm_flags[$flag] = $value;
-		}
-	}
-
-	// -------------------------------------------------------------------------
-
-	/**
-	 * returns the value of a stored value
-	 *
-	 * @param	mixed	$value	name of the value requested
-	 *
-	 * @return	mixed	the value of the value, or NULL if not found
-	 */
-	public function dm_get_value($value)
-	{
-		if ( isset($this->dm_values[$value]) )
-		{
-			return $this->dm_values[$value];
-		}
-
-		// unknown flag
-		return NULL;
-	}
-
-	// -------------------------------------------------------------------------
-
-	/**
-	 * returns the value of a stored config value
-	 *
-	 * @param	mixed	$name	name of the config value requested
-	 * @param	mixed	$subkey	name of the subkey value requested
-	 *
-	 * @return	mixed	the value, or NULL if not found
-	 */
-	public function dm_get_config($name = NULL, $subkey = NULL)
-	{
-		if ( func_num_args() == 0 )
-		{
-			return $this->dm_config;
-		}
-		else
-		{
-			if ( isset($this->dm_config[$name]) )
-			{
-				if ( ! is_null($subkey) AND isset($this->dm_config[$name][$subkey]) )
-				{
-					return $this->dm_config[$name][$subkey];
-				}
-				return $this->dm_config[$name];
-			}
-		}
-
-		// unknown flag
-		return NULL;
-	}
-
-	// -------------------------------------------------------------------------
-
-	/**
-	 * set or reset an error message
-	 *
-	 * @param	string	$field		field name to set the message on
-	 * @param	string	$message	message
-	 *
-	 * @return	mixed	the value, or NULL if not found
-	 */
-	public function error_message($field, $message = '')
-	{
-		$this->error->message($field, $message);
-	}
 
 	// -------------------------------------------------------------------------
 	// DataMapper public core methods
@@ -1517,6 +1413,71 @@ class DataMapper implements IteratorAggregate
 
 		// for method chaining
 		return $this;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * returns the SQL string of the current query (SELECTs ONLY)
+	 *
+	 * note that this also _clears_ the current query info!
+	 *
+	 * This can be used to generate subqueries.
+	 *
+	 * @param	integer|NULL	$limit	limit the number of results
+	 * @param	integer|NULL	$offset	offset the results when limiting
+	 *
+	 * @return	string	SQL as a string
+	 */
+	public function get_sql($limit = NULL, $offset = NULL, $handle_related = FALSE)
+	{
+		if ( $handle_related )
+		{
+die($TODO = 'get_sql(): handle related queries');
+		}
+
+		$this->db->dm_call_method('_track_aliases', $this->dm_config['table']);
+		$this->db->from($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE));
+
+		$this->dm_default_order_by();
+
+		if ( ! is_null($limit) )
+		{
+			$this->limit($limit, $offset);
+		}
+
+		$sql = $this->db->dm_call_method('_compile_select');
+
+		$this->dm_clear_after_query();
+
+		return $sql;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * runs the query, but returns the raw CodeIgniter results
+	 *
+	 * note that this also _clears_ the current query info!
+	 *
+	 * @param	integer|NULL	$limit	limit the number of results
+	 * @param	integer|NULL	$offset	offset the results when limiting
+	 *
+	 * @return	CI_DB_result	result object
+	 */
+	public function get_raw($limit = NULL, $offset = NULL, $handle_related = TRUE)
+	{
+		if ( $handle_related )
+		{
+die($TODO = 'get_raw(): handle related queries');
+		}
+
+		$this->dm_default_order_by();
+
+		$query = $this->db->get($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE), $limit, $offset);
+		$this->dm_clear_after_query();
+
+		return $query;
 	}
 
 	// --------------------------------------------------------------------
@@ -1722,7 +1683,6 @@ class DataMapper implements IteratorAggregate
 		// clear any saved values
 		$this->dm_values = array(
 			'parent' => NULL,
-			'instantiations' =>NULL,
 		);
 
 		$this->dm_refresh_original_values();
@@ -2443,22 +2403,6 @@ class DataMapper implements IteratorAggregate
 	// --------------------------------------------------------------------
 
 	/**
-	 * get the name of the table alias
-	 *
-	 * @param	string	$model		name of the model to lookup
-	 * @param	bool	$protect	if true, the alias will be protected
-	 *
-	 * @return	string	alias, or the current models table if not found
-	 */
-	public function dm_table_alias($model, $protect = FALSE)
-	{
-		$alias = isset(DataMapper::$dm_table_aliases[$model]) ? DataMapper::$dm_table_aliases[$model] : $this->dmconfig['table'];
-		return $protect ? $this->db->protect_identifiers($alias) : $alias;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
 	 * sets the ORDER BY portion of the query.
 	 *
 	 * @param	string	$orderby	field to order by
@@ -2541,6 +2485,132 @@ class DataMapper implements IteratorAggregate
 		return $copy;
 	}
 
+	// -------------------------------------------------------------------------
+	// DataMapper public support methods
+	// -------------------------------------------------------------------------
+
+	/**
+	 * returns the value of a stored flag
+	 *
+	 * @param	string	$flag	name of the flag requested
+	 *
+	 * @return	mixed	the value of the flag, or NULL if not found
+	 */
+	public function dm_get_flag($flag)
+	{
+		if ( isset($this->dm_flags[$flag]) )
+		{
+			return $this->dm_flags[$flag];
+		}
+
+		// unknown flag
+		return NULL;
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * sets the value of a stored flag
+	 *
+	 * @param	string	$flag	name of the flag requested
+	 * @param	mixed	$flag	name of the flag requested
+	 *
+	 * @return	void
+	 */
+	public function dm_set_flag($flag, $value)
+	{
+		if ( isset($this->dm_flags[$flag]) )
+		{
+			$this->dm_flags[$flag] = $value;
+		}
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * returns the value of a stored value
+	 *
+	 * @param	mixed	$value	name of the value requested
+	 *
+	 * @return	mixed	the value of the value, or NULL if not found
+	 */
+	public function dm_get_value($value)
+	{
+		if ( isset($this->dm_values[$value]) )
+		{
+			return $this->dm_values[$value];
+		}
+
+		// unknown flag
+		return NULL;
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * returns the value of a stored config value
+	 *
+	 * @param	mixed	$name	name of the config value requested
+	 * @param	mixed	$subkey	name of the subkey value requested
+	 *
+	 * @return	mixed	the value, or NULL if not found
+	 */
+	public function dm_get_config($name = NULL, $subkey = NULL)
+	{
+		if ( func_num_args() == 0 )
+		{
+			return $this->dm_config;
+		}
+		else
+		{
+			if ( isset($this->dm_config[$name]) )
+			{
+				if ( ! is_null($subkey) AND isset($this->dm_config[$name][$subkey]) )
+				{
+					return $this->dm_config[$name][$subkey];
+				}
+				return $this->dm_config[$name];
+			}
+		}
+
+		// unknown flag
+		return NULL;
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * set or reset an error message
+	 *
+	 * @param	string	$field		field name to set the message on
+	 * @param	string	$message	message
+	 *
+	 * @return	mixed	the value, or NULL if not found
+	 */
+	public function error_message($field, $message = '')
+	{
+		$this->error->message($field, $message);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * get the name of the table alias
+	 *
+	 * @param	string	$model		name of the model to lookup
+	 * @param	bool	$protect	if true, the alias will be protected
+	 *
+	 * @return	string	alias, or the current models table if not found
+	 */
+	public function dm_table_alias($model, $protect = FALSE)
+	{
+		if ( ! isset(DataMapper::$dm_table_aliases[$model]) )
+		{
+			DataMapper::$dm_table_aliases[$model] = 'DM_'.self::$alias_counter++;
+		}
+		return $protect ? $this->db->protect_identifiers(DataMapper::$dm_table_aliases[$model]) : DataMapper::$dm_table_aliases[$model];
+	}
+
 	// --------------------------------------------------------------------
 
 	/**
@@ -2602,9 +2672,6 @@ class DataMapper implements IteratorAggregate
 				}
 			}
 
-			// remove instantiations
-			$this->dm_values['instantiations'] = NULL;
-
 			// free large queries
 			if ( $query->num_rows() > $this->dm_config['config']['free_result_threshold'] )
 			{
@@ -2659,92 +2726,6 @@ class DataMapper implements IteratorAggregate
 		}
 
 		$item->dm_refresh_original_values();
-
-		if ( $this->dm_values['instantiations'] )
-		{
-			foreach ( $this->dm_values['instantiations'] as $related_field => $field_map )
-			{
-				// convert fields to a 'row' object
-				$row = new stdClass();
-				foreach ( $field_map as $item_field => $c_field )
-				{
-					$row->{$c_field} = $item->{$item_field};
-				}
-				// get the related item
-				$c =& $item->dm_get_without_auto_populating($related_field);
-				// set the values
-				$c->dm_to_object($c, $row);
-
-				// also set up the ->all array
-				$c->all = array();
-				$c->all[0] = $c->get_clone();
-			}
-		}
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * returns the SQL string of the current query (SELECTs ONLY)
-	 *
-	 * note that this also _clears_ the current query info!
-	 *
-	 * This can be used to generate subqueries.
-	 *
-	 * @param	integer|NULL	$limit	limit the number of results
-	 * @param	integer|NULL	$offset	offset the results when limiting
-	 *
-	 * @return	string	SQL as a string
-	 */
-	public function get_sql($limit = NULL, $offset = NULL, $handle_related = FALSE)
-	{
-		if ( $handle_related )
-		{
-die($TODO = 'get_sql(): handle related queries');
-		}
-
-		$this->db->dm_call_method('_track_aliases', $this->dm_config['table']);
-		$this->db->from($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE));
-
-		$this->dm_default_order_by();
-
-		if ( ! is_null($limit) )
-		{
-			$this->limit($limit, $offset);
-		}
-
-		$sql = $this->db->dm_call_method('_compile_select');
-
-		$this->dm_clear_after_query();
-
-		return $sql;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * runs the query, but returns the raw CodeIgniter results
-	 *
-	 * note that this also _clears_ the current query info!
-	 *
-	 * @param	integer|NULL	$limit	limit the number of results
-	 * @param	integer|NULL	$offset	offset the results when limiting
-	 *
-	 * @return	CI_DB_result	result object
-	 */
-	public function get_raw($limit = NULL, $offset = NULL, $handle_related = TRUE)
-	{
-		if ( $handle_related )
-		{
-die($TODO = 'get_raw(): handle related queries');
-		}
-
-		$this->dm_default_order_by();
-
-		$query = $this->db->get($this->dm_config['table'].' '.$this->dm_table_alias($this->dm_config['model'], TRUE), $limit, $offset);
-		$this->dm_clear_after_query();
-
-		return $query;
 	}
 
 	// -------------------------------------------------------------------------
@@ -2863,6 +2844,27 @@ die($TODO = 'get_raw(): handle related queries');
 		return $data;
 	}
 
+	// --------------------------------------------------------------------
+
+	/**
+	 * gets objects by specified field name and value
+	 *
+	 * @ignore
+	 *
+	 * @param	string $field Field to look at.
+	 * @param	array $value Arguments to this method.
+	 * @return	DataMapper Returns self for method chaining.
+	 */
+	protected function dm_get_by($field, $value = array())
+	{
+		if (isset($value[0]))
+		{
+			$this->where($field, $value[0]);
+		}
+
+		return $this->get();
+	}
+
 	// -------------------------------------------------------------------------
 
 	/**
@@ -2945,6 +2947,25 @@ die($TODO = 'get_raw(): handle related queries');
 		}
 
 		return $type;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * @ignore
+	 *
+	 * @param	string	$query Query method.
+	 * @param	array	$arguments Arguments for query.
+	 *
+	 * @return	DataMapper	returns self for method chaining
+	 */
+	protected function dm_join_field($query, $arguments)
+	{
+		// add the relation for this join
+		$this->dm_related($query, $arguments, NULL, TRUE);
+
+		// For method chaining
+		return $this;
 	}
 
 	// --------------------------------------------------------------------
@@ -3140,9 +3161,6 @@ die($TODO = 'deal with the new keys structure');
 		// clear the query as if it was run
 		$this->db->dm_call_method('_reset_select');
 
-		// in case some include_related instantiations were set up, clear them
-		$this->dm_values['instantiations'] = NULL;
-
 		// Clear the saved iterator
 		unset($this->dm_dataset_iterator);
 	}
@@ -3230,71 +3248,138 @@ die($TODO = 'deal with the new keys structure');
 	 * @param	string	$query		query string
 	 * @param	array	$arguments	arguments to process
 	 * @param	mixed	$extra		used to prevent escaping in special circumstances
+	 * @param	bool	$join_only	interal only. used when only the join table needs to be joined
 	 *
 	 * @return	DataMapper			returns self for method chaining
 	 */
-	protected function dm_related($query, $arguments = array(), $extra = NULL)
+	protected function dm_related($query, $arguments = array(), $extra = NULL, $join_only = FALSE)
 	{
+		// start relating from the current object
+		$current = $this;
+
 		if ( ! empty($query) && ! empty($arguments) )
 		{
-			// related by object
+			// determine the related object: related by deep relationship objects
+			if ( is_array($arguments[0]) )
+			{
+				while ( count($arguments[0]) > 1 )
+				{
+					$object = array_shift($arguments[0]);
+
+					// find out what the relation is
+					if ( ! $relation = $current->dm_find_relationship($object->dm_get_config('model')) )
+					{
+						throw new DataMapper_Exception("DataMapper: Unable to relate '{$current->dm_config['model']}' with '$related_field'");
+					}
+
+					// get the relationship definition seen from the related model
+					$other_relation = $object->dm_find_relationship($current->dm_config['model']);
+
+					// add the join to the query
+					$current->dm_add_relation($relation, $other_relation);
+
+					// make the related object the new 'current'
+					$current = $object;
+				}
+
+				$arguments[0] = array_shift($arguments[0]);
+			}
+
+			// determine the related object: related by deep relationship string
+			elseif ( is_string($arguments[0]) AND strpos($arguments[0], '/') !== FALSE )
+			{
+				// add the 'in-between' relations, one at the time
+				while ( true )
+				{
+					// strip the first relation of the argument, and adjust the argument
+					$related_field = substr( $arguments[0], 0, strpos($arguments[0], '/') );
+					$arguments[0] = substr( $arguments[0], strlen($related_field) + 1);
+
+					// find out what the relation is
+					if ( ! $relation = $current->dm_find_relationship($related_field) )
+					{
+						throw new DataMapper_Exception("DataMapper: Unable to relate '{$this->dm_config['model']}' with '$related_field'");
+					}
+
+					// instantiate the related class
+					$class = $relation['related_class'];
+					$object = new $class();
+
+					// get the relationship definition seen from the related model
+					$other_relation = $object->dm_find_relationship($current->dm_config['model']);
+
+					// add the join to the query
+					$current->dm_add_relation($relation, $other_relation);
+
+					// make the related object the new 'current'
+					$current = $object;
+
+					// bail out if none are left, the last one is added below as normal
+					if ( strpos($arguments[0], '/') === FALSE )
+					{
+						break;
+					}
+
+				}
+			}
+
+			// determine the related object: related by object
 			if ( $arguments[0] instanceOf DataMapper )
 			{
-				die($TODO = 'dm_related() related query based on an object');
+				$object = array_shift($arguments);
+
+				// find out what the relation is
+				if ( ! $relation = $current->dm_find_relationship($object->dm_get_config('model')) )
+				{
+					throw new DataMapper_Exception("DataMapper: Unable to relate '{$current->dm_config['model']}' with '$related_field'");
+				}
+
 			}
 
-			// related by deep relationship
-			elseif ( strpos($arguments[0], '/') !== FALSE )
-			{
-				die($TODO = 'dm_related() related query based on an deep relation');
-			}
-
-			// normal relationship
+			// determine the related object: relationship by name
 			else
 			{
 				// find out what the relation is
 				$related_field = array_shift($arguments);
-				if ( ! $relation = $this->dm_find_relationship($related_field) )
+				if ( ! $relation = $current->dm_find_relationship($related_field) )
 				{
-					throw new DataMapper_Exception("DataMapper: Unable to relate '{$this->dm_config['model']}' with '$related_field'");
+					throw new DataMapper_Exception("DataMapper: Unable to relate '{$current->dm_config['model']}' with '$related_field'");
 				}
 
 				$class = $relation['related_class'];
 
-				// no selection arguments present
-				if ( empty($arguments) )
-				{
-					$selection = array();
-					$object = new $class();
-				}
+				$object = new $class();
+			}
 
-				// selection is already an array
-				elseif ( is_array($arguments[0]) )
-				{
-					$selection = array_shift($arguments);
-					$object = new $class();
-				}
+			// no selection arguments present
+			if ( empty($arguments) )
+			{
+				$selection = array();
+			}
 
-				// selection is another object
-				elseif ( $arguments[0] instanceOf DataMapper )
-				{
-					$object = array_shift($arguments);
-					die($TODO = 'related query based on a passed object');
-				}
-				else
-				{
-					$object = new $class();
-					die($TODO = 'related query based on a passed field/value pair');
-				}
+			// selection is already an array
+			elseif ( is_array($arguments[0]) )
+			{
+				$selection = array_shift($arguments);
+			}
+
+			// selection is another object
+			elseif ( $arguments[0] instanceOf DataMapper )
+			{
+				die($TODO = 'related query based on a passed object');
+			}
+			else
+			{
+				$selection = array( array_shift($arguments) => array_shift($arguments) );
 			}
 
 			// get the relationship definition seen from the related model
-			$other_relation = $object->dm_find_relationship($this->dm_config['model']);
+			$other_relation = $object->dm_find_relationship($current->dm_config['model']);
 
 			$TODO = 'prevent un-needed joins when selecting on related keys only';
 
 			// add the join to the query
-			$this->dm_add_relation($relation, $other_relation);
+			$current->dm_add_relation($relation, $other_relation, $join_only);
 
 			// allow special arguments to be passed into query methods
 			if ( is_null($extra) )
@@ -3306,7 +3391,14 @@ die($TODO = 'deal with the new keys structure');
 			$keys = array();
 			foreach ( $selection as $name => $value )
 			{
-				$keys[$this->dm_table_alias($other_relation['my_class']).'.'.$name] = $value;
+				if ( $join_only )
+				{
+					$keys[$current->dm_table_alias($other_relation['join_table']).'.'.$name] = $value;
+				}
+				else
+				{
+					$keys[$current->dm_table_alias($other_relation['my_class']).'.'.$name] = $value;
+				}
 			}
 
 			// add the selection to the query
@@ -3358,12 +3450,12 @@ die($TODO = 'deal with the new keys structure');
 			$cond = '';
 			for ( $i = 0; $i < count($modela['my_key']); $i++ )
 			{
-				$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['join_table'].'.'.$modela['related_key'][$i];
+				$cond .= ( empty($cond) ? '' : ' AND ' ) . $this->dm_table_alias($modela['join_table']).'.'.$modela['related_key'][$i];
 				$cond .= ' = ' . $this->dm_table_alias($modela['my_class']).'.'.$modela['my_key'][$i];
 			}
 
 			// join modela to the join table
-			$this->db->join($modela['join_table'], $cond, 'LEFT OUTER');
+			$this->db->join($modela['join_table'].' '.$this->dm_table_alias($modela['join_table']), $cond, 'LEFT OUTER');
 
 			// join modelb to the join table
 			if ( $join_only === FALSE )
@@ -3372,7 +3464,7 @@ die($TODO = 'deal with the new keys structure');
 				$cond = '';
 				for ( $i = 0; $i < count($modelb['my_key']); $i++ )
 				{
-					$cond .= ( empty($cond) ? '' : ' AND ' ) . $modela['join_table'].'.'.$modelb['related_key'][$i];
+					$cond .= ( empty($cond) ? '' : ' AND ' ) . $this->dm_table_alias($modela['join_table']).'.'.$modelb['related_key'][$i];
 					$cond .= ' = ' . $this->dm_table_alias($modelb['my_class']).'.'.$modelb['my_key'][$i];
 				}
 
