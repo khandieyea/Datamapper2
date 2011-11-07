@@ -147,6 +147,10 @@ class DataMapper implements IteratorAggregate
 		'get_cached'             => 'DataMapper_Simplecache',
 		'clear_cache'            => 'DataMapper_Simplecache',
 
+		// core extension: cache methods
+		'row_index'              => 'DataMapper_Rowindex',
+		'row_indices'            => 'DataMapper_Rowindex',
+
 		// core extension: transaction methods
 		'trans_begin'            => 'DataMapper_Transactions',
 		'trans_commit'           => 'DataMapper_Transactions',
@@ -827,31 +831,44 @@ class DataMapper implements IteratorAggregate
 		{
 			foreach ( $extensions as $extension )
 			{
-				// determine the extension class name
-				$class = 'DataMapper_'.ucfirst($extension);
-
-				// trigger the autoloader
-				if ( class_exists($class, TRUE) )
+				// and extension can by an array of method->class pairs
+				if ( is_array($extension) )
 				{
-					// register the public methods of this extension class
-					foreach ( get_class_methods($class) as $method )
+					foreach ( $extension as $method => $class )
 					{
-						if ( isset(DataMapper::$dm_extension_methods[$method]) )
-						{
-							if ( DataMapper::$dm_extension_methods[$method] != $class AND ! $overload)
-							{
-								throw new DataMapper_Exception("DataMapper: duplicate method '$method' detected in extension '$extension' (also defined in '".DataMapper::$dm_extension_methods[$method]."')");
-							}
-						}
-						else
-						{
-							DataMapper::$dm_extension_methods[$method] = $class;
-						}
+						DataMapper::$dm_extension_methods[$method] = $class;
 					}
 				}
+
+				// or a string indicating the class base name
 				else
 				{
-					throw new DataMapper_Exception("DataMapper: defined extension '$extension' can not be found");
+					// determine the extension class name
+					$class = 'DataMapper_'.ucfirst($extension);
+
+					// trigger the autoloader
+					if ( class_exists($class, TRUE) )
+					{
+						// register the public methods of this extension class
+						foreach ( get_class_methods($class) as $method )
+						{
+							if ( isset(DataMapper::$dm_extension_methods[$method]) )
+							{
+								if ( DataMapper::$dm_extension_methods[$method] != $class AND ! $overload)
+								{
+									throw new DataMapper_Exception("DataMapper: duplicate method '$method' detected in extension '$extension' (also defined in '".DataMapper::$dm_extension_methods[$method]."')");
+								}
+							}
+							else
+							{
+								DataMapper::$dm_extension_methods[$method] = $class;
+							}
+						}
+					}
+					else
+					{
+						throw new DataMapper_Exception("DataMapper: defined extension '$extension' can not be found");
+					}
 				}
 			}
 		}
@@ -1381,6 +1398,36 @@ class DataMapper implements IteratorAggregate
 	// DataMapper public core methods
 	// -------------------------------------------------------------------------
 
+	// --------------------------------------------------------------------
+
+	/**
+	 * reloads in the configuration data for a model. this is mainly
+	 * used to handle language changes. all instances will see the changes
+	 */
+	public function reinitialize_model()
+	{
+		DataMapper::dm_configure_model($this);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * convenience method to return the number of items from the last call to get
+	 *
+	 * @return	int
+	 */
+	public function result_count()
+	{
+		if ( isset($this->dm_dataset_iterator) )
+		{
+			return $this->dm_dataset_iterator->result_count();
+		}
+		else
+		{
+			return count($this->all);
+		}
+	}
+
 	/**
 	 * get objects from the database.
 	 *
@@ -1512,6 +1559,147 @@ die($TODO = 'get_raw(): handle related queries');
 		$this->dm_clear_after_query();
 
 		return $query;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * get items matching the where clause
+	 *
+	 * @param	mixed			$where	see where()
+	 * @param	integer|NULL	$limit	limit the number of results
+	 * @param	integer|NULL	$offset	offset the results when limiting
+	 *
+	 * @return	DataMapper	returns self for method chaining
+	 */
+	public function get_where($where = array(), $limit = NULL, $offset = NULL)
+	{
+		$this->where($where);
+
+		return $this->get($limit, $offset);
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * runs the specified query and populates the current object with the results
+	 *
+	 * warning: Use at your own risk.  This will only be as reliable as your query
+	 *
+	 * @param	string		$sql	the query to process
+	 * @param	array|bool	$binds	array of values to bind (see CodeIgniter)
+	 *
+	 * @return	DataMapper	returns self for method chaining
+	 */
+	public function query($sql, $binds = FALSE)
+	{
+		// run the custom query
+		$query = $this->db->query($sql, $binds);
+
+		// and convert it into DataMapper objects
+		$this->dm_process_query($query);
+
+		// for method chaining
+		return $this;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * clears the current object
+	 *
+	 * @return	DataMapper	returns self for method chaining
+	 */
+	public function clear()
+	{
+		// clear the all list
+		$this->all = array();
+
+		// clear errors
+		$this->error->clear();
+
+		// clear this objects properties
+		foreach ($this->dm_config['fields'] as $field)
+		{
+			$this->dm_current->{$field} = NULL;
+		}
+
+		// clear this objects related objects
+		foreach ( $this->dm_config['relations'] as $relation_type )
+		{
+			foreach ( $relation_type as $related => $properties )
+			{
+				if ( isset($this->dm_current->{$related}) )
+				{
+					unset($this->dm_current->{$related});
+				}
+			}
+		}
+
+		// clear and refresh stored values
+		$this->dm_original = new DataMapper_Datastorage();
+
+		// clear the saved iterator
+		$this->dm_dataset_iterator = NULL;
+
+		$this->dm_refresh_original_values();
+
+		// For method chaining
+		return $this;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * removes any empty objects in this objects all list.
+	 * only needs to be used if you are looping through the all list
+	 * a second time and you have deleted a record the first time through.
+	 *
+	 * @return	bool	FALSE	if the $all array was already empty
+	 */
+	public function refresh_all()
+	{
+		if ( ! empty($this->all) )
+		{
+			foreach ($this->all as $key => $item)
+			{
+				if ( ! $item->exists() )
+				{
+					unset($this->all[$key]);
+				}
+			}
+			return TRUE;
+		}
+
+		return FALSE;
+	}
+
+	// --------------------------------------------------------------------
+
+	/**
+	 * returns TRUE if the current object has a database record
+	 *
+	 * @return	bool
+	 */
+	public function exists()
+	{
+		// returns TRUE if the keys of this object is set and not empty, OR
+		// there are items in the ALL array.
+		$exists = TRUE;
+
+		foreach ( $this->dm_config['keys'] as $key => $type)
+		{
+			if ( empty($this->dm_current->{$key}) )
+			{
+				$exists = FALSE;
+				break;
+			}
+		}
+
+		// not all keys are set, check if we have results in the all array
+		! $exists AND $exists = ($this->result_count() > 0);
+
+		return $exists;
 	}
 
 	// --------------------------------------------------------------------
@@ -1655,177 +1843,6 @@ die($TODO = 'get_raw(): handle related queries');
 
 		// for method chaining
 		return $this;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * get items matching the where clause
-	 *
-	 * @param	mixed			$where	see where()
-	 * @param	integer|NULL	$limit	limit the number of results
-	 * @param	integer|NULL	$offset	offset the results when limiting
-	 *
-	 * @return	DataMapper	returns self for method chaining
-	 */
-	public function get_where($where = array(), $limit = NULL, $offset = NULL)
-	{
-		$this->where($where);
-
-		return $this->get($limit, $offset);
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * clears the current object
-	 *
-	 * @return	DataMapper	returns self for method chaining
-	 */
-	public function clear()
-	{
-		// clear the all list
-		$this->all = array();
-
-		// clear errors
-		$this->error->clear();
-
-		// clear this objects properties
-		foreach ($this->dm_config['fields'] as $field)
-		{
-			$this->dm_current->{$field} = NULL;
-		}
-
-		// clear this objects related objects
-		foreach ( $this->dm_config['relations'] as $relation_type )
-		{
-			foreach ( $relation_type as $related => $properties )
-			{
-				if ( isset($this->dm_current->{$related}) )
-				{
-					unset($this->dm_current->{$related});
-				}
-			}
-		}
-
-		// clear and refresh stored values
-		$this->dm_original = new DataMapper_Datastorage();
-
-		// clear the saved iterator
-		$this->dm_dataset_iterator = NULL;
-
-		$this->dm_refresh_original_values();
-
-		// For method chaining
-		return $this;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * runs the specified query and populates the current object with the results
-	 *
-	 * warning: Use at your own risk.  This will only be as reliable as your query
-	 *
-	 * @param	string		$sql	the query to process
-	 * @param	array|bool	$binds	array of values to bind (see CodeIgniter)
-	 *
-	 * @return	DataMapper	returns self for method chaining
-	 */
-	public function query($sql, $binds = FALSE)
-	{
-		// run the custom query
-		$query = $this->db->query($sql, $binds);
-
-		// and convert it into DataMapper objects
-		$this->dm_process_query($query);
-
-		// for method chaining
-		return $this;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * reloads in the configuration data for a model. this is mainly
-	 * used to handle language changes. all instances will see the changes
-	 */
-	public function reinitialize_model()
-	{
-		DataMapper::dm_configure_model($this);
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * returns TRUE if the current object has a database record
-	 *
-	 * @return	bool
-	 */
-	public function exists()
-	{
-		// returns TRUE if the keys of this object is set and not empty, OR
-		// there are items in the ALL array.
-		$exists = TRUE;
-
-		foreach ( $this->dm_config['keys'] as $key => $type)
-		{
-			if ( empty($this->dm_current->{$key}) )
-			{
-				$exists = FALSE;
-				break;
-			}
-		}
-
-		// not all keys are set, check if we have results in the all array
-		! $exists AND $exists = ($this->result_count() > 0);
-
-		return $exists;
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * convenience method to return the number of items from the last call to get
-	 *
-	 * @return	int
-	 */
-	public function result_count()
-	{
-		if ( isset($this->dm_dataset_iterator) )
-		{
-			return $this->dm_dataset_iterator->result_count();
-		}
-		else
-		{
-			return count($this->all);
-		}
-	}
-
-	// --------------------------------------------------------------------
-
-	/**
-	 * removes any empty objects in this objects all list.
-	 * only needs to be used if you are looping through the all list
-	 * a second time and you have deleted a record the first time through.
-	 *
-	 * @return	bool	FALSE	if the $all array was already empty
-	 */
-	public function refresh_all()
-	{
-		if ( ! empty($this->all) )
-		{
-			foreach ($this->all as $key => $item)
-			{
-				if ( ! $item->exists() )
-				{
-					unset($this->all[$key]);
-				}
-			}
-			return TRUE;
-		}
-
-		return FALSE;
 	}
 
 	// --------------------------------------------------------------------
@@ -2807,6 +2824,25 @@ die($TODO = 'get_raw(): handle related queries');
 
 		// unknown flag
 		return NULL;
+	}
+
+	// -------------------------------------------------------------------------
+
+	/**
+	 * returns an array with the object's key's
+	 *
+	 * @return	array	array of key-value pairs
+	 */
+	public function dm_get_keys()
+	{
+		$result = array();
+
+		foreach ( $this->dm_config['keys'] as $key => $unused )
+		{
+			$result[$key] =>> $this->{$key};
+		}
+
+		return $result;
 	}
 
 	// -------------------------------------------------------------------------

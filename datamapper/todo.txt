@@ -22,4 +22,6 @@ DataMapper v2 Todo:
    - NOTE: do we need an undelete?
    - NOTE: do we need to be able to selected deleted records?
 
-
+-> adding support for observers:
+   - have them deal with created / updated
+   - have them deal with soft_delete too?
