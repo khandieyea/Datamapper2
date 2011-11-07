@@ -107,11 +107,12 @@ class DataMapper_Array
 	 * note that this only works for models with a single key column!
 	 *
 	 * @param	DataMapper	$dmobject	the DataMapper Object to convert
-	 * @param	string		$field	to include
+	 * @param	string		$fields		field, or array of fields to include
+	 * @param	string		$separator	if $field is an array, the separator to be used
 	 *
 	 * @return	array	an array of associative arrays
 	 */
-	public static function all_to_single_array($dmobject, $field = '')
+	public static function all_to_single_array($dmobject, $fields = '', $separator)
 	{
 		if ( count($dmobject->dm_get_config('keys')) != 1 )
 		{
@@ -119,14 +120,22 @@ class DataMapper_Array
 		}
 		$key = key($dmobject->dm_get_config('keys'));
 
+		// make sure $field is an array
+		is_array($fields) OR $fields = array($fields);
+
 		// loop through each object in the $all array, convert them to
 		// an array, and add them to a new array.
 		$result = array();
-		if ( ! empty($field) )
+		if ( ! empty($fields) )
 		{
 			foreach ( $dmobject as $o )
 			{
-				isset($o->{$field}) AND $result[$o->{$key}] = $o->{$field};
+				$single = '';
+				foreach ( $fields as $field )
+				{
+					isset($o->{$field}) AND $single .= ( empty($single) ? '' : $separator ) . $o->{$field};
+				}
+				$result[$o->{$key}] = $single;
 			}
 		}
 		return $result;

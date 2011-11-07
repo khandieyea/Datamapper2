@@ -807,6 +807,28 @@ class DataMapper_Tests_Manual_Basic
 		);
 
 		$result = DataMapper_Tests::assertEqual($dmtesta->all_to_array(), $expected_result, '$model->where("id", 1)->group_start()->where("id !=", 2)->or_where("id", 3)->group_end()->get();');
+
+		// empty group test
+
+		try
+		{
+			$dmtesta = new Dmtesta();
+			$dmtesta->where('id', 1)->group_start()->group_end()->get();
+		}
+		catch (Exception $e)
+		{
+			DataMapper_Tests::failed('Exception: '.$e->getMessage());
+		}
+
+		$expected_result = array(
+			array(
+				'id' => 1,
+				'fk_id_A' => 0,
+				'data_A' => 'Table A Row 1',
+			),
+		);
+
+		$result = DataMapper_Tests::assertEqual($dmtesta->all_to_array(), $expected_result, '$model->where("id", 1)->group_start()->group_end()->get();');
 	}
 
 	/*

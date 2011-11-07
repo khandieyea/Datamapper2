@@ -133,11 +133,19 @@ class DataMapper implements IteratorAggregate
 		'all_to_array'           => 'DataMapper_Array',
 		'all_to_single_array'    => 'DataMapper_Array',
 
-		// core extension: validation methods
-		'validate'               => 'DataMapper_Validation',
-		'skip_validation'        => 'DataMapper_Validation',
-		'force_validation'       => 'DataMapper_Validation',
-		'run_get_rules'          => 'DataMapper_Validation',
+		// core extension: csv methods
+		'csv_export'               => 'DataMapper_Csv',
+		'csv_import'               => 'DataMapper_Csv',
+
+		// core extension: json methods
+		'from_json'              => 'DataMapper_Json',
+		'to_json'                => 'DataMapper_Json',
+		'all_to_json'            => 'DataMapper_Json',
+		'set_json_content_type'  => 'DataMapper_Json',
+
+		// core extension: cache methods
+		'get_cached'             => 'DataMapper_Simplecache',
+		'clear_cache'            => 'DataMapper_Simplecache',
 
 		// core extension: transaction methods
 		'trans_begin'            => 'DataMapper_Transactions',
@@ -150,6 +158,15 @@ class DataMapper implements IteratorAggregate
 		'trans_strict'           => 'DataMapper_Transactions',
 		'dm_auto_trans_begin'    => 'DataMapper_Transactions',
 		'dm_auto_trans_complete' => 'DataMapper_Transactions',
+
+		// core extension: translate methods
+		'translate'              => 'DataMapper_Translate',
+
+		// core extension: validation methods
+		'validate'               => 'DataMapper_Validation',
+		'skip_validation'        => 'DataMapper_Validation',
+		'force_validation'       => 'DataMapper_Validation',
+		'run_get_rules'          => 'DataMapper_Validation',
 	);
 
 	/**
@@ -2096,11 +2113,27 @@ die($TODO = 'get_raw(): handle related queries');
 	 */
 	public function group_end()
 	{
-		$value = str_repeat(' ', $this->dm_flags['group_count']) . ')';
-		$this->db->ar_where[] = $value;
-		if ( $this->db->ar_caching )
+		// check for an empty group
+		$last = end($this->db->ar_where);
+		if ( substr($last, -1) == '(' )
 		{
-			$this->db->ar_cache_where[] = $value;
+			// remove it
+			array_pop($this->db->ar_where);
+			if ( $this->db->ar_caching )
+			{
+				array_pop($this->db->ar_cache_where);
+			}
+		}
+		else
+		{
+			// close the current group
+			$value = str_repeat(' ', $this->dm_flags['group_count']) . ')';
+
+			$this->db->ar_where[] = $value;
+			if ( $this->db->ar_caching )
+			{
+				$this->db->ar_cache_where[] = $value;
+			}
 		}
 
 		$this->dm_flags['where_group_started'] = FALSE;
@@ -2721,10 +2754,7 @@ die($TODO = 'get_raw(): handle related queries');
 	 */
 	public function dm_set_flag($flag, $value)
 	{
-		if ( isset($this->dm_flags[$flag]) )
-		{
-			$this->dm_flags[$flag] = $value;
-		}
+		$this->dm_flags[$flag] = $value;
 	}
 
 	// -------------------------------------------------------------------------
